@@ -23,9 +23,14 @@ type TestConfig struct {
 	NumRequests      int    `json:"NumRequests"`
 }
 
+
+type TriggerMessage struct {
+	TestID  string `json:"test_id"`
+	Trigger string `json:"trigger"`
+}
+
 type Producer struct {
 	producer          *kafka.Producer
-	topic             string
 	deliveryChannel   chan kafka.Event
 }
 
@@ -39,36 +44,23 @@ func generateUniqueToken() (string, error) {
 	return token, nil
 }
 
-func CreateProducer(p *kafka.Producer, topic string) *Producer {
+func CreateProducer(p *kafka.Producer) *Producer {
 	return &Producer{
 		producer:         p,
-		topic:            topic,
 		deliveryChannel:  make(chan kafka.Event, 10000),
 	}
 }
 
-func sendTestConfig(testConfiguration TestConfig) error {
-	p, err := kafka.NewProducer(&kafka.ConfigMap{
-		"bootstrap.servers": "localhost:9092",
-		"client.id":         "something",
-		"acks":              "all",
-	})
-
-	if err != nil {
-		fmt.Printf("Failed to create producer: %s\n", err)
-		os.Exit(1)
-	}
-
-	prod := CreateProducer(p, "test_config")
-
+func (prod *Producer) sendTestConfig(testConfiguration TestConfig) error {
 	jsonMessage, err := json.Marshal(testConfiguration)
 	if err != nil {
 		return err
 	}
 
+	topic := "test_config"
 	err = prod.producer.Produce(&kafka.Message{
 			TopicPartition: kafka.TopicPartition{
-				Topic:     &prod.topic,
+				Topic:     &topic,
 				Partition: kafka.PartitionAny,
 			},
 			Value: jsonMessage,
@@ -83,6 +75,34 @@ func sendTestConfig(testConfiguration TestConfig) error {
 	return nil
 }
 
+func (prod *Producer) sendTriggerMessage(TestID string) error {
+	triggerMessage := TriggerMessage{
+		TestID:  TestID,
+		Trigger: "YES",
+	}
+
+	jsonMessage, err := json.Marshal(triggerMessage)
+	if err != nil {
+		return err
+	}
+
+	topic := "trigger"
+	err = prod.producer.Produce(&kafka.Message{
+		TopicPartition: kafka.TopicPartition{
+			Topic:     &topic,
+			Partition: kafka.PartitionAny,
+		},
+		Value: jsonMessage,
+	}, prod.deliveryChannel)
+
+	if err != nil {
+		return err
+	}
+	<-prod.deliveryChannel
+
+	fmt.Printf("Trigger message sent for Test ID: %s\n", TestID)
+	return nil
+}
 
 func main() {
 	http.HandleFunc("/ping", handlePostTest)
@@ -95,7 +115,6 @@ func handlePostTest(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	fmt.Printf("here")
 
 	var requestBody RequestBody
     err := json.NewDecoder(r.Body).Decode(&requestBody)
@@ -121,7 +140,21 @@ func handlePostTest(w http.ResponseWriter, r *http.Request) {
 	
 	fmt.Printf("Test Config: %+v\n", testConfig)
 
-	sendTestConfig(testConfig)
+	p, err := kafka.NewProducer(&kafka.ConfigMap{
+		"bootstrap.servers": "localhost:9092",
+		"client.id":         "something",
+		"acks":              "all",
+	})
+
+	if err != nil {
+		fmt.Printf("Failed to create producer: %s\n", err)
+		os.Exit(1)
+	}
+
+	prod := CreateProducer(p)
+
+	prod.sendTestConfig(testConfig)
+	prod.sendTriggerMessage(Test_ID)
 	
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte("POST request received successfully"))
