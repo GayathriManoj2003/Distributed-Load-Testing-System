@@ -1,18 +1,26 @@
-import React, { useState } from 'react'
+import React, { useRef, useState } from 'react'
 import axios from "axios"
 import { useNavigate } from 'react-router-dom';
 
 const CreateTest = () => {
     const [inputs, setInputs] = useState({
-        NumberNodes: 0,
         TestType: "",
-        TestMessageDelay: 0
+        TestMessageDelay: 0,
+        NumRequests: 0
     });
     const [err, setError] = useState(null);
+    const myInputRef = useRef(null);
 
     const navigate = useNavigate()
 
     const handleChange = (e) => {
+        if( e.target.name === "TestType" && e.target.value === "Avalanche") {
+            setInputs((prev) => ({ ...prev, TestMessageDelay: 0 }));
+            const inputElement = myInputRef.current;
+            if (inputElement) {
+                inputElement.value = '0';
+            }
+        }
         setInputs((prev) => ({ ...prev, [e.target.name]: e.target.type === 'number' ? parseInt(e.target.value, 10) : e.target.value }));
     };
     const handleSubmit = async (e) => {
@@ -20,7 +28,7 @@ const CreateTest = () => {
         console.log(inputs);
     
         try {
-            const res = await axios.post("http://localhost:8080/test_config", inputs, {
+            const res = await axios.post("http://localhost:8080/ping", inputs, {
                 headers: {
                     "Content-Type": "application/json",
                 },
@@ -44,8 +52,17 @@ const CreateTest = () => {
                             <option value="Avalanche">Avalanche</option>
                             <option value="Tsunami">Tsunami</option>
                         </select>
-                        <input required type="number"  name = "TestMessageDelay" placeholder = "Delay (ms)" onChange={handleChange} />
-                        <input required type="number" min="2" max="8" name = "NumberNodes" placeholder = "Number of Driver Nodes (2 - 8) " onChange={handleChange} />
+                        <input required type="number"  
+                            name = "TestMessageDelay" 
+                            placeholder = "Delay (ms)"
+                            onChange={handleChange} 
+                            disabled = {inputs.TestType === "Avalanche"}
+                            ref={myInputRef}
+                        />
+                        <input required type="number" min="1"
+                         name = "NumRequests" 
+                         placeholder = "Number of Requests per Second" 
+                         onChange={handleChange} />
                         {err && <p className='error'> Error: {err}</p>}
                         <button type="submit">Submit Test</button>
                     </form>
