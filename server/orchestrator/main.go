@@ -17,10 +17,10 @@ type RequestBody struct {
 }
 
 type TestConfig struct {
-	TestID         string `json:"TestID"`
-	TestType         string `json:"TestType"`
-	TestMessageDelay int    `json:"TestMessageDelay"`
-	NumRequests      int    `json:"NumRequests"`
+	TestID         			string `json:"test_id"`
+	TestType         		string `json:"test_type"`
+	TestMessageDelay 		int    `json:"test_message_delay"`
+	MessageCountPerDriver	int    `json:"message_count_per_driver"`
 }
 
 
@@ -132,10 +132,10 @@ func handlePostTest(w http.ResponseWriter, r *http.Request) {
 	fmt.Println("Test_ID:", Test_ID)
 
 	testConfig := TestConfig{
-		TestID:           Test_ID,
-		TestType:         requestBody.TestType,
-		TestMessageDelay: requestBody.TestMessageDelay,
-		NumRequests:      requestBody.NumRequests,
+		TestID:           		Test_ID,
+		TestType:         		requestBody.TestType,
+		TestMessageDelay: 		requestBody.TestMessageDelay,
+		MessageCountPerDriver:	requestBody.NumRequests,
 	}
 	
 	fmt.Printf("Test Config: %+v\n", testConfig)
