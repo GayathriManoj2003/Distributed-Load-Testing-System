@@ -20,15 +20,14 @@ func generateUniqueToken() (string, error) {
 	if err != nil {
 		return "", err
 	}
-
 	token := hex.EncodeToString(randomBytes)
-
 	return token, nil
 }
 
 
 func main() {
 	http.HandleFunc("/test_config", handlePostTest)
+	fmt.Println("Starting server on :8080...")
 	http.ListenAndServe(":8080", addCorsHeaders(http.DefaultServeMux))
 }
 
