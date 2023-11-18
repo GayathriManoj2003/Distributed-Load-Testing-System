@@ -114,7 +114,7 @@ func main() {
 	run := true
 	sigchan := make(chan os.Signal, 1)
 	signal.Notify(sigchan, syscall.SIGINT, syscall.SIGTERM)
-	var count int
+	var test TestConfig
 	for run == true {
 		select {
 		case sig := <-sigchan:
@@ -129,17 +129,21 @@ func main() {
 				switch *e.TopicPartition.Topic {
 				case "test_config":
 					var testConfig TestConfig
-					// count := testConfig.MessageCountPerDriver
 					if err := json.Unmarshal(e.Value, &testConfig); err == nil {
-						storeTestConfig(testConfig)
-						count = testConfig.MessageCountPerDriver
+						test = testConfig
 					}
 				case "trigger":
 					var triggerMessage TriggerMessage
 					if err := json.Unmarshal(e.Value, &triggerMessage); err == nil {
-						testID := triggerMessage.TestID
-						testConfig := retrieveTestConfig(consumer, testID, count)
-						performTsunamiTest(testConfig)
+						if triggerMessage.Trigger == "YES" {
+							if test.TestType == "Tsunami" {
+								performTsunamiTest(test)
+							}
+							if test.TestType == "Avalanche" {
+								performAvalancheTest(test)
+							}
+
+						}
 					}
 				}
 			case kafka.Error:
@@ -153,26 +157,6 @@ func main() {
 
 	fmt.Println("Closing consumer")
 	consumer.Close()
-}
-
-// Helper function to store test configurations
-func storeTestConfig(testConfig TestConfig) {
-	// Implement logic to store the test configuration
-	fmt.Printf("Storing test configuration: %+v\n", testConfig)
-}
-
-// Helper function to retrieve test configuration for a given TestID
-func retrieveTestConfig(consumer *kafka.Consumer, testID string, count int) TestConfig {
-	// Implement logic to retrieve the test configuration
-	// This might involve polling for messages with the specified TestID
-	// and decoding the JSON content
-	// For simplicity, this function returns a dummy TestConfig
-	return TestConfig{
-		TestID:                testID,
-		TestType:              "Avalanche",
-		TestMessageDelay:      0,
-		MessageCountPerDriver: count,
-	}
 }
 
 func performTsunamiTest(testConfig TestConfig) {
@@ -195,7 +179,6 @@ func performTsunamiTest(testConfig TestConfig) {
 	// Use a goroutine to periodically send metrics
 	go func() {
 		for {
-			
 
 			if len(currentLatencies) > 0 {
 				allLatencies = append(allLatencies, currentLatencies...)
@@ -243,7 +226,8 @@ func performTsunamiTest(testConfig TestConfig) {
 		fmt.Printf("Request %d - Latency: %d ms\n", i, latency)
 		req++
 		currentLatencies = append(currentLatencies, latency)
-		time.Sleep(interval)
+		timer := time.After(interval)
+		<-timer // block until timer channel sends a value
 	}
 
 	// Close the MetricProducer when done
@@ -251,10 +235,11 @@ func performTsunamiTest(testConfig TestConfig) {
 
 	fmt.Printf("Tsunami test completed for TestID: %s\n", testConfig.TestID)
 }
+
 // Helper function to perform HTTP tests and send metrics at a fixed interval
-func performHTTPTest(testConfig TestConfig) {
+func performAvalancheTest(testConfig TestConfig) {
 	// Example: Report metrics every 5 seconds
-	interval := 1 * time.Second
+
 	// interval := 10 * time.Millisecond
 	var req int = 0
 	fmt.Printf("Performing HTTP test for TestID: %s\n", testConfig.TestID)
@@ -272,7 +257,6 @@ func performHTTPTest(testConfig TestConfig) {
 	// Use a goroutine to periodically send metrics
 	go func() {
 		for {
-			time.Sleep(interval)
 
 			if len(currentLatencies) > 0 {
 				allLatencies = append(allLatencies, currentLatencies...)
