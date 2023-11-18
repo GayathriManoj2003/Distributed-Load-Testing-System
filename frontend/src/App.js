@@ -3,13 +3,12 @@ import {
   RouterProvider,
   Outlet
 } from "react-router-dom"
+
 import React from 'react';
-import CreateTest from "./pages/CreateTest";
 import Home from "./pages/Home";
-// import Navbar from "./components/Navbar";
-// import Footer from "./components/Footer";
+import SubmitTest from "./pages/SubmitTest";
+import Dashboard from "./pages/Dashboard";
 import './App.css';
-import StartTest from "./pages/StartTest";
 
 const Layout = () => {
   return (
@@ -28,15 +27,15 @@ const router = createBrowserRouter([
     children: [
         {
           path: "/submit_test",
-          element: <CreateTest/>
+          element: <SubmitTest/>
         },
         {
           path: "/",
           element: <Home/>
         },
         {
-          path: "/start_test",
-          element: <StartTest/>
+          path: "/dashboard",
+          element: <Dashboard/>
         }
     ]
   }
