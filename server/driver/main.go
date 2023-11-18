@@ -34,10 +34,9 @@ type MetricMessage struct {
 
 // MetricsData structure
 type MetricsData struct {
-	MeanLatency   int `json:"mean_latency"`
-	MedianLatency int `json:"median_latency"`
-	MinLatency    int `json:"min_latency"`
-	MaxLatency    int `json:"max_latency"`
+	MeanLatency float64 `json:"mean_latency"`
+	MinLatency  float64 `json:"min_latency"`
+	MaxLatency  float64 `json:"max_latency"`
 }
 type MetricProducer struct {
 	producer        *kafka.Producer
@@ -170,8 +169,8 @@ func performTsunamiTest(testConfig TestConfig) {
 	numRequests := testConfig.MessageCountPerDriver
 	fmt.Printf("%d requests will be sent\n", numRequests)
 
-	var allLatencies []int     // Store all latencies for calculating cumulative metrics
-	var currentLatencies []int // Store latencies for the current interval
+	var allLatencies []float64     // Store all latencies for calculating cumulative metrics
+	var currentLatencies []float64 // Store latencies for the current interval
 
 	// Create metric producer
 	metricProducer := NewMetricProducer()
@@ -183,7 +182,7 @@ func performTsunamiTest(testConfig TestConfig) {
 			if len(currentLatencies) > 0 {
 				allLatencies = append(allLatencies, currentLatencies...)
 
-				meanLatency, medianLatency, minLatency, maxLatency := calculateLatencyMetrics(allLatencies)
+				meanLatency, minLatency, maxLatency := calculateLatencyMetrics(allLatencies)
 
 				// Create and publish metric message
 				metricMessage := MetricMessage{
@@ -192,10 +191,9 @@ func performTsunamiTest(testConfig TestConfig) {
 					ReportID: testConfig.TestID,
 					NoOfReq:  req,
 					Metrics: MetricsData{
-						MeanLatency:   meanLatency,
-						MedianLatency: medianLatency,
-						MinLatency:    minLatency,
-						MaxLatency:    maxLatency,
+						MeanLatency: meanLatency,
+						MinLatency:  minLatency,
+						MaxLatency:  maxLatency,
 					},
 				}
 				metricProducer.PublishMetric(metricMessage)
@@ -220,7 +218,7 @@ func performTsunamiTest(testConfig TestConfig) {
 		defer resp.Body.Close()
 
 		// Measure latency
-		latency := int(time.Since(startTime).Milliseconds())
+		latency := float64(time.Since(startTime).Milliseconds())
 
 		// Print results
 		fmt.Printf("Request %d - Latency: %d ms\n", i, latency)
@@ -248,8 +246,8 @@ func performAvalancheTest(testConfig TestConfig) {
 	numRequests := testConfig.MessageCountPerDriver
 	fmt.Printf("%d requests will be sent\n", numRequests)
 
-	var allLatencies []int     // Store all latencies for calculating cumulative metrics
-	var currentLatencies []int // Store latencies for the current interval
+	var allLatencies []float64     // Store all latencies for calculating cumulative metrics
+	var currentLatencies []float64 // Store latencies for the current interval
 
 	// Create metric producer
 	metricProducer := NewMetricProducer()
@@ -261,7 +259,7 @@ func performAvalancheTest(testConfig TestConfig) {
 			if len(currentLatencies) > 0 {
 				allLatencies = append(allLatencies, currentLatencies...)
 
-				meanLatency, medianLatency, minLatency, maxLatency := calculateLatencyMetrics(allLatencies)
+				meanLatency, minLatency, maxLatency := calculateLatencyMetrics(allLatencies)
 
 				// Create and publish metric message
 				metricMessage := MetricMessage{
@@ -270,10 +268,9 @@ func performAvalancheTest(testConfig TestConfig) {
 					ReportID: testConfig.TestID,
 					NoOfReq:  req,
 					Metrics: MetricsData{
-						MeanLatency:   meanLatency,
-						MedianLatency: medianLatency,
-						MinLatency:    minLatency,
-						MaxLatency:    maxLatency,
+						MeanLatency: meanLatency,
+						MinLatency:  minLatency,
+						MaxLatency:  maxLatency,
 					},
 				}
 				metricProducer.PublishMetric(metricMessage)
@@ -298,7 +295,7 @@ func performAvalancheTest(testConfig TestConfig) {
 		defer resp.Body.Close()
 
 		// Measure latency
-		latency := int(time.Since(startTime).Milliseconds())
+		latency := float64(time.Since(startTime).Milliseconds())
 
 		// Print results
 		fmt.Printf("Request %d - Latency: %d ms\n", i, latency)
@@ -312,43 +309,23 @@ func performAvalancheTest(testConfig TestConfig) {
 	fmt.Printf("HTTP test completed for TestID: %s\n", testConfig.TestID)
 }
 
-func calculateLatencyMetrics(latencies []int) (int, int, int, int) {
+func calculateLatencyMetrics(latencies []float64) (float64, float64, float64) {
 	// Calculate mean latency
-	var sumLatency int
+	var sumLatency float64
 	for _, latency := range latencies {
 		sumLatency += latency
 	}
-	meanLatency := sumLatency / len(latencies)
+	meanLatency := sumLatency / float64(len(latencies))
 
 	// Calculate median latency
-	medianLatency := calculateMedian(latencies)
+	// medianLatency := calculateMedian(latencies)
 
 	// Calculate min latency
-	sort.Ints(latencies)
+	sort.Float64s(latencies)
 	minLatency := latencies[0]
 
 	// Calculate max latency
 	maxLatency := latencies[len(latencies)-1]
 
-	return meanLatency, medianLatency, minLatency, maxLatency
-}
-
-// Helper function to calculate the median of a slice of integers
-func calculateMedian(latencies []int) int {
-	n := len(latencies)
-	if n == 0 {
-		return 0
-	}
-
-	sort.Ints(latencies)
-
-	if n%2 == 0 {
-		// If the number of latencies is even, calculate the average of the two middle values
-		middle1 := latencies[n/2-1]
-		middle2 := latencies[n/2]
-		return (middle1 + middle2) / 2
-	} else {
-		// If the number of latencies is odd, return the middle value
-		return latencies[n/2]
-	}
+	return meanLatency, minLatency, maxLatency
 }
