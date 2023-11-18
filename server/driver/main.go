@@ -28,6 +28,7 @@ type MetricMessage struct {
 	NodeID   string      `json:"node_id"`
 	TestID   string      `json:"test_id"`
 	ReportID string      `json:"report_id"`
+	NoOfReq  int         `json:"no_of_req"`
 	Metrics  MetricsData `json:"metrics"`
 }
 
@@ -177,9 +178,9 @@ func retrieveTestConfig(consumer *kafka.Consumer, testID string, count int) Test
 // Helper function to perform HTTP tests and send metrics at a fixed interval
 func performHTTPTest(testConfig TestConfig) {
 	// Example: Report metrics every 5 seconds
-	// interval := 0.01 * time.Second
-	interval := 10 * time.Millisecond
-
+	interval := 1 * time.Second
+	// interval := 10 * time.Millisecond
+	var req int = 0
 	fmt.Printf("Performing HTTP test for TestID: %s\n", testConfig.TestID)
 
 	url := "https://github.com"
@@ -207,6 +208,7 @@ func performHTTPTest(testConfig TestConfig) {
 					NodeID:   testConfig.TestID,
 					TestID:   testConfig.TestID,
 					ReportID: testConfig.TestID,
+					NoOfReq:  req,
 					Metrics: MetricsData{
 						MeanLatency:   meanLatency,
 						MedianLatency: medianLatency,
@@ -218,6 +220,7 @@ func performHTTPTest(testConfig TestConfig) {
 
 				// Clear currentLatencies for the next interval
 				currentLatencies = nil
+				req = 0
 			}
 		}
 	}()
@@ -239,11 +242,12 @@ func performHTTPTest(testConfig TestConfig) {
 
 		// Print results
 		fmt.Printf("Request %d - Latency: %d ms\n", i, latency)
+		req++
 		currentLatencies = append(currentLatencies, latency)
 	}
 
 	// Close the MetricProducer when done
-	metricProducer.Close()
+	// metricProducer.Close()
 
 	fmt.Printf("HTTP test completed for TestID: %s\n", testConfig.TestID)
 }
