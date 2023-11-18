@@ -139,7 +139,7 @@ func main() {
 					if err := json.Unmarshal(e.Value, &triggerMessage); err == nil {
 						testID := triggerMessage.TestID
 						testConfig := retrieveTestConfig(consumer, testID, count)
-						performHTTPTest(testConfig)
+						performTsunamiTest(testConfig)
 					}
 				}
 			case kafka.Error:
@@ -175,6 +175,81 @@ func retrieveTestConfig(consumer *kafka.Consumer, testID string, count int) Test
 	}
 }
 
+func performTsunamiTest(testConfig TestConfig) {
+	fmt.Printf("Performing Tsunami test for TestID: %s\n", testConfig.TestID)
+
+	// Implement logic to perform Tsunami tests with delays between requests
+	interval := time.Duration(testConfig.TestMessageDelay) * time.Millisecond
+	var req int = 0
+
+	url := "https://github.com"
+	numRequests := testConfig.MessageCountPerDriver
+	fmt.Printf("%d requests will be sent\n", numRequests)
+
+	var allLatencies []int     // Store all latencies for calculating cumulative metrics
+	var currentLatencies []int // Store latencies for the current interval
+
+	// Create metric producer
+	metricProducer := NewMetricProducer()
+
+	// Use a goroutine to periodically send metrics
+	go func() {
+		for {
+			time.Sleep(interval)
+
+			if len(currentLatencies) > 0 {
+				allLatencies = append(allLatencies, currentLatencies...)
+
+				meanLatency, medianLatency, minLatency, maxLatency := calculateLatencyMetrics(allLatencies)
+
+				// Create and publish metric message
+				metricMessage := MetricMessage{
+					NodeID:   testConfig.TestID,
+					TestID:   testConfig.TestID,
+					ReportID: testConfig.TestID,
+					NoOfReq:  req,
+					Metrics: MetricsData{
+						MeanLatency:   meanLatency,
+						MedianLatency: medianLatency,
+						MinLatency:    minLatency,
+						MaxLatency:    maxLatency,
+					},
+				}
+				metricProducer.PublishMetric(metricMessage)
+
+				// Clear currentLatencies for the next interval
+				currentLatencies = nil
+				req = 0
+			}
+		}
+	}()
+
+	// Perform HTTP requests with delay
+	for i := 1; i <= numRequests; i++ {
+		startTime := time.Now()
+
+		// Send HTTP GET request
+		resp, err := http.Get(url)
+		if err != nil {
+			fmt.Printf("Error sending HTTP request: %v\n", err)
+			return
+		}
+		defer resp.Body.Close()
+
+		// Measure latency
+		latency := int(time.Since(startTime).Milliseconds())
+
+		// Print results
+		fmt.Printf("Request %d - Latency: %d ms\n", i, latency)
+		req++
+		currentLatencies = append(currentLatencies, latency)
+	}
+
+	// Close the MetricProducer when done
+	// metricProducer.Close()
+
+	fmt.Printf("Tsunami test completed for TestID: %s\n", testConfig.TestID)
+}
 // Helper function to perform HTTP tests and send metrics at a fixed interval
 func performHTTPTest(testConfig TestConfig) {
 	// Example: Report metrics every 5 seconds
