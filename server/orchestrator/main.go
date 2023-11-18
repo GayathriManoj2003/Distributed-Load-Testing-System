@@ -6,10 +6,49 @@ import (
 	"os"
 	"net/http"
 	"crypto/rand"
+	"time"
 	"encoding/hex"
 	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
+	"github.com/gorilla/websocket"
 )
 
+var upgrader = websocket.Upgrader{
+	CheckOrigin: func(r *http.Request) bool {
+		return true
+	},
+}
+
+// WebSocketClients stores connected clients
+var WebSocketClients = make(map[*websocket.Conn]bool)
+
+func SendMessageToClients(message string) {
+	for client := range WebSocketClients {
+		err := client.WriteMessage(websocket.TextMessage, []byte(message))
+		if err != nil {
+			fmt.Println("Error writing to WebSocket:", err)
+			delete(WebSocketClients, client)
+			client.Close()
+		}
+	}
+}
+
+func handleWebSocket(w http.ResponseWriter, r *http.Request) {
+	conn, err := upgrader.Upgrade(w, r, nil)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	defer conn.Close()
+
+	// Add the client to the WebSocketClients map
+	WebSocketClients[conn] = true
+
+	for {
+		// Keep the connection open for further communication
+		// You can extend this loop to handle incoming messages from clients
+		time.Sleep(time.Second)
+	}
+}
 type RequestBody struct {
 	TestType         string `json:"TestType"`
 	TestMessageDelay int    `json:"TestMessageDelay"`
@@ -105,6 +144,7 @@ func (prod *Producer) sendTriggerMessage(TestID string) error {
 }
 
 func main() {
+	http.HandleFunc("/ws", handleWebSocket)
 	http.HandleFunc("/ping", handlePostTest)
 	fmt.Println("Starting server on :8080...")
 	http.ListenAndServe(":8080", addCorsHeaders(http.DefaultServeMux))
@@ -117,27 +157,40 @@ func handlePostTest(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var requestBody RequestBody
-    err := json.NewDecoder(r.Body).Decode(&requestBody)
-    if err != nil {
-        fmt.Printf("Error decoding JSON: %v\n", err)
-        http.Error(w, "Bad Request", http.StatusBadRequest)
-        return
-    }
+	err := json.NewDecoder(r.Body).Decode(&requestBody)
+	if err != nil {
+		fmt.Printf("Error decoding JSON: %v\n", err)
+		http.Error(w, "Bad Request", http.StatusBadRequest)
+		return
+	}
+
 	Test_ID, err := generateUniqueToken()
 	if err != nil {
 		fmt.Println("Error generating unique token:", err)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
 	}
+
 	fmt.Printf("Received POST request with body: %+v\n", requestBody)
 	fmt.Println("Test_ID:", Test_ID)
 
+	// Send the response to the client
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte(Test_ID))
+
+	// Start Kafka-related operations asynchronously
+	go startKafkaStuff(Test_ID, requestBody)
+}
+
+
+func startKafkaStuff(Test_ID string, requestBody RequestBody) {
 	testConfig := TestConfig{
-		TestID:           		Test_ID,
-		TestType:         		requestBody.TestType,
-		TestMessageDelay: 		requestBody.TestMessageDelay,
-		MessageCountPerDriver:	requestBody.NumRequests,
+		TestID:                Test_ID,
+		TestType:              requestBody.TestType,
+		TestMessageDelay:      requestBody.TestMessageDelay,
+		MessageCountPerDriver: requestBody.NumRequests,
 	}
-	
+
 	fmt.Printf("Test Config: %+v\n", testConfig)
 
 	p, err := kafka.NewProducer(&kafka.ConfigMap{
@@ -145,6 +198,17 @@ func handlePostTest(w http.ResponseWriter, r *http.Request) {
 		"client.id":         "something",
 		"acks":              "all",
 	})
+
+	consumer, err := kafka.NewConsumer(&kafka.ConfigMap{
+		"bootstrap.servers": "localhost:9092",
+		"group.id":          "metrics-consumer-group",
+		"auto.offset.reset": "earliest",
+	})
+
+	if err != nil {
+		fmt.Printf("Failed to create consumer: %s\n", err)
+		os.Exit(1)
+	}
 
 	if err != nil {
 		fmt.Printf("Failed to create producer: %s\n", err)
@@ -155,11 +219,14 @@ func handlePostTest(w http.ResponseWriter, r *http.Request) {
 
 	prod.sendTestConfig(testConfig)
 	prod.sendTriggerMessage(Test_ID)
-	
-	w.WriteHeader(http.StatusOK)
-	w.Write([]byte("POST request received successfully"))
-}
 
+	topics := "metrics"
+	consumer.Subscribe(topics, nil)
+	metricsConsumer := CreateMetricsConsumer()
+	metricsConsumer.consumer = consumer
+
+	metricsConsumer.HandleMetricsMessage()
+}
 func addCorsHeaders(handler http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", "*")

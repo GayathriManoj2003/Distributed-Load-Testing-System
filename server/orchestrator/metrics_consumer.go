@@ -7,52 +7,50 @@ import (
 	"math"
 	"os"
 	"os/signal"
-	"strconv"
 	"sync"
 	"syscall"
 
 	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
+	"github.com/gorilla/websocket"
 )
 
+type MetricsData struct {
+	MeanLatency float64 `json:"mean_latency"`
+	MinLatency  float64 `json:"min_latency"`
+	MaxLatency  float64 `json:"max_latency"`
+}
+
 type AggregatedMetrics struct {
-	TotalRequests      int
-	MeanLatency        float64
-	MinLatency         float64
-	MaxLatency         float64
-	TotalNumRequests   int // New field to store the total number of requests
-	TestID             string
-	NodeID             string
+	TotalRequests    int
+	MeanLatency      float64
+	MinLatency       float64
+	MaxLatency       float64
+	TotalNumRequests int
+	TestID           string
+	NodeID           string
 }
 
 type MetricsMessage struct {
-	NodeID   string `json:"node_id"`
-	TestID   string `json:"test_id"`
-	NumRequests int `json:"num_requests"`
-	Metrics  struct {
-		MeanLatency string `json:"mean_latency"`
-		MinLatency  string `json:"min_latency"`
-		MaxLatency  string `json:"max_latency"`
-	} `json:"metrics"`
+	NodeID   string      `json:"node_id"`
+	TestID   string      `json:"test_id"`
+	ReportID string      `json:"report_id"`
+	NoOfReq  int         `json:"no_of_req"`
+	Metrics  MetricsData `json:"metrics"`
 }
 
 type MetricsConsumer struct {
 	consumer           *kafka.Consumer
-	aggregatedMetrics  map[string]*AggregatedMetrics // Dictionary to store aggregated metrics by TestID and NodeID
+	aggregatedMetrics  map[string]*AggregatedMetrics
 	aggregatedRequests int
-	totalNumRequests   int // New field to store the total number of requests across all messages
+	totalNumRequests   int
 	metricsLock        sync.Mutex
-}
-
-type Metrics struct {
-	TotalRequests int     `json:"total_requests"`
-	MeanLatency   float64 `json:"mean_latency"`
-	MinLatency    float64 `json:"min_latency"`
-	MaxLatency    float64 `json:"max_latency"`
+	wsConn             *websocket.Conn 
 }
 
 func CreateMetricsConsumer() *MetricsConsumer {
 	return &MetricsConsumer{
 		aggregatedMetrics: make(map[string]*AggregatedMetrics),
+		wsConn:            nil,
 	}
 }
 
@@ -90,12 +88,18 @@ func (mc *MetricsConsumer) consumeMetrics() {
 	}
 }
 
+func (mc *MetricsConsumer) setWebSocketConnection(conn *websocket.Conn) {
+    mc.metricsLock.Lock()
+    defer mc.metricsLock.Unlock()
+
+    mc.wsConn = conn
+}
+
 func (mc *MetricsConsumer) processMetrics(metrics MetricsMessage) {
 	mc.metricsLock.Lock()
 	defer mc.metricsLock.Unlock()
-
 	// Increment the total number of requests
-	mc.totalNumRequests += metrics.NumRequests
+	mc.totalNumRequests += metrics.NoOfReq
 
 	// Check if TestID and NodeID are present in the dictionary
 	key := metrics.TestID + "_" + metrics.NodeID
@@ -103,25 +107,36 @@ func (mc *MetricsConsumer) processMetrics(metrics MetricsMessage) {
 		mc.aggregatedMetrics[key] = &AggregatedMetrics{
 			TestID: metrics.TestID,
 			NodeID: metrics.NodeID,
+			TotalRequests: 0,
+			MinLatency: metrics.Metrics.MinLatency,
+			MaxLatency:	metrics.Metrics.MaxLatency,
+			TotalNumRequests: 0,
 		}
 	}
-	fmt.Printf("Aggregated metrics : Test ID: %s, Node ID: %s, Total Requests: %d, Mean Latency: %f, Min Latency: %f, Max Latency: %f, Total Num Requests: %d\n",
-		mc.aggregatedMetrics[key].TestID, mc.aggregatedMetrics[key].NodeID,
-		mc.aggregatedMetrics[key].TotalRequests, mc.aggregatedMetrics[key].MeanLatency,
-		mc.aggregatedMetrics[key].MinLatency, mc.aggregatedMetrics[key].MaxLatency,
-		mc.totalNumRequests)
 
 	// Add metrics values to the aggregated metrics
-	mc.aggregatedMetrics[key].TotalRequests += 1
-	meanLatency, _ := strconv.ParseFloat(metrics.Metrics.MeanLatency, 64)
-	mc.aggregatedMetrics[key].MeanLatency += (meanLatency)
-	minLatency, _ := strconv.ParseFloat(metrics.Metrics.MinLatency, 64)
-	mc.aggregatedMetrics[key].MinLatency = math.Max(mc.aggregatedMetrics[key].MinLatency, minLatency)
-	maxLatency, _ := strconv.ParseFloat(metrics.Metrics.MaxLatency, 64)
-	mc.aggregatedMetrics[key].MaxLatency = math.Max(mc.aggregatedMetrics[key].MaxLatency, maxLatency)
+	mc.aggregatedMetrics[key].TotalRequests++
+	mc.aggregatedMetrics[key].MeanLatency += metrics.Metrics.MeanLatency
+	mc.aggregatedMetrics[key].MinLatency = math.Min(mc.aggregatedMetrics[key].MinLatency, metrics.Metrics.MinLatency)
+	fmt.Printf("%.2f\n",metrics.Metrics.MinLatency)
+	mc.aggregatedMetrics[key].MaxLatency = math.Max(mc.aggregatedMetrics[key].MaxLatency, metrics.Metrics.MaxLatency)
 
-	fmt.Printf("Received metrics for Test ID: %s, Node ID: %s, No of Requests: %d\n", metrics.TestID, metrics.NodeID, metrics.NumRequests)
+	fmt.Printf("Received metrics for Test ID: %s, Node ID: %s, No of Requests: %d\n", metrics.TestID, metrics.NodeID, metrics.NoOfReq)
+	fmt.Printf("Aggregated Metrics:\n")
+	fmt.Printf("Updated Aggregated Metrics:\n")
+	fmt.Printf("  Test ID: %s\n", key)
+	fmt.Printf("  Total Requests: %d\n", mc.aggregatedMetrics[key].TotalRequests)
+	fmt.Printf("  Mean Latency: %.2f ms\n", mc.aggregatedMetrics[key].MeanLatency)
+	fmt.Printf("  Min Latency: %.2f ms\n", mc.aggregatedMetrics[key].MinLatency)
+	fmt.Printf("  Max Latency: %.2f ms\n", mc.aggregatedMetrics[key].MaxLatency)
 
+	json_bytes, err := json.Marshal(mc.aggregatedMetrics[key])
+	if err != nil {
+		fmt.Printf("Error encoding JSON: %v\n", err)
+		return
+	}
+	message := string(json_bytes)
+	SendMessageToClients(message)
 	// Check if the desired number of requests is met
 	if mc.totalNumRequests == 10 {
 		mc.calculateAndStoreAggregatedMetrics(key)
@@ -131,17 +146,21 @@ func (mc *MetricsConsumer) processMetrics(metrics MetricsMessage) {
 func (mc *MetricsConsumer) calculateAndStoreAggregatedMetrics(key string) {
 	// Calculate mean values
 	mc.aggregatedMetrics[key].MeanLatency /= float64(mc.aggregatedMetrics[key].TotalRequests)
+
 	// Create a struct to hold the aggregated metrics
 	aggregatedData := struct {
-		TestID       string  `json:"test_id"`
-		Metrics      Metrics `json:"metrics"`
+		TestID  string      `json:"test_id"`
+		Metrics AggregatedMetrics `json:"metrics"`
 	}{
 		TestID: mc.aggregatedMetrics[key].TestID,
-		Metrics: Metrics{
+		Metrics: AggregatedMetrics{
 			TotalRequests: mc.aggregatedMetrics[key].TotalRequests,
 			MeanLatency:   mc.aggregatedMetrics[key].MeanLatency,
 			MinLatency:    mc.aggregatedMetrics[key].MinLatency,
 			MaxLatency:    mc.aggregatedMetrics[key].MaxLatency,
+			TotalNumRequests: mc.aggregatedMetrics[key].TotalNumRequests,
+			TestID:        mc.aggregatedMetrics[key].TestID,
+			NodeID:        mc.aggregatedMetrics[key].NodeID,
 		},
 	}
 
@@ -153,7 +172,7 @@ func (mc *MetricsConsumer) calculateAndStoreAggregatedMetrics(key string) {
 	}
 
 	// Save to a JSON file
-	fileName := fmt.Sprintf("%s_%s_metrics.json", mc.aggregatedMetrics[key].TestID, mc.aggregatedMetrics[key].NodeID)
+	fileName := fmt.Sprintf("Test_Reports/%s_%s_metrics.json", mc.aggregatedMetrics[key].TestID, mc.aggregatedMetrics[key].NodeID)
 	err = ioutil.WriteFile(fileName, jsonData, 0644)
 	if err != nil {
 		fmt.Printf("Error writing to file: %v\n", err)
@@ -163,24 +182,7 @@ func (mc *MetricsConsumer) calculateAndStoreAggregatedMetrics(key string) {
 	fmt.Printf("Aggregated metrics saved to %s\n", fileName)
 }
 
-func main() {
-	consumer, err := kafka.NewConsumer(&kafka.ConfigMap{
-		"bootstrap.servers": "localhost:9092",
-		"group.id":          "metrics-consumer-group",
-		"auto.offset.reset": "earliest",
-	})
-
-	if err != nil {
-		fmt.Printf("Failed to create consumer: %s\n", err)
-		os.Exit(1)
-	}
-
-	metricsConsumer := CreateMetricsConsumer()
-	metricsConsumer.consumer = consumer
-
-	topics := []string{"metrics"}
-	consumer.SubscribeTopics(topics, nil)
-
+func (cons *MetricsConsumer) HandleMetricsMessage() {
 	fmt.Println("Metrics Consumer started...")
-	metricsConsumer.consumeMetrics()
+	cons.consumeMetrics()
 }
