@@ -9,9 +9,15 @@ import (
 	"sort"
 	"syscall"
 	"time"
+	"crypto/rand"
+	"encoding/hex"
 
 	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
 )
+
+type RegistrationMessage struct {
+	NodeID string `json:"node_id"`
+}
 
 type TestConfig struct {
 	TestID                string `json:"test_id"`
@@ -41,6 +47,16 @@ type MetricsData struct {
 type MetricProducer struct {
 	producer        *kafka.Producer
 	deliveryChannel chan kafka.Event
+}
+
+func generateUniqueToken() (string, error) {
+	randomBytes := make([]byte, 16)
+	_, err := rand.Read(randomBytes)
+	if err != nil {
+		return "", err
+	}
+	token := hex.EncodeToString(randomBytes)
+	return token, nil
 }
 
 func NewMetricProducer() *MetricProducer {
@@ -73,7 +89,7 @@ func (mp *MetricProducer) PublishMetric(metricMessage MetricMessage) {
 		return
 	}
 
-	topic := "metric_topic"
+	topic := "metrics"
 	err = mp.producer.Produce(&kafka.Message{
 		TopicPartition: kafka.TopicPartition{
 			Topic:     &topic,
@@ -92,6 +108,23 @@ func (mp *MetricProducer) PublishMetric(metricMessage MetricMessage) {
 }
 func main() {
 	topics := []string{"test_config", "trigger"}
+
+	// Create the producer for metric messages
+	metricProducer := NewMetricProducer()
+
+	// Generate nodeID
+	nodeID, err := generateUniqueToken()
+	if err != nil {
+		fmt.Println("Error generating unique token:", err)
+		os.Exit(1)
+	}
+
+	// Send registration message to orchestrator
+	err = sendRegistrationMessage(metricProducer, nodeID)
+	if err != nil {
+		fmt.Printf("Failed to send registration message: %s\n", err)
+		os.Exit(1)
+	}
 
 	consumer, err := kafka.NewConsumer(&kafka.ConfigMap{
 		"bootstrap.servers": "localhost:9092",
@@ -136,10 +169,10 @@ func main() {
 					if err := json.Unmarshal(e.Value, &triggerMessage); err == nil {
 						if triggerMessage.Trigger == "YES" {
 							if test.TestType == "Tsunami" {
-								performTsunamiTest(test)
+								performTsunamiTest(test, nodeID)
 							}
 							if test.TestType == "Avalanche" {
-								performAvalancheTest(test)
+								performAvalancheTest(test, nodeID)
 							}
 
 						}
@@ -158,7 +191,36 @@ func main() {
 	consumer.Close()
 }
 
-func performTsunamiTest(testConfig TestConfig) {
+// Helper function to send registration messages
+func sendRegistrationMessage(prod *MetricProducer, nodeID string) error {
+	regMessage := RegistrationMessage{
+		NodeID: nodeID,
+	}
+
+	jsonMessage, err := json.Marshal(regMessage)
+	if err != nil {
+		return err
+	}
+
+	topic := "registration"
+	err = prod.producer.Produce(&kafka.Message{
+		TopicPartition: kafka.TopicPartition{
+			Topic:     &topic,
+			Partition: kafka.PartitionAny,
+		},
+		Value: jsonMessage,
+	}, prod.deliveryChannel)
+
+	if err != nil {
+		return err
+	}
+	<-prod.deliveryChannel
+
+	fmt.Printf("Registration message sent. Node ID: %s\n", nodeID)
+	return nil
+}
+
+func performTsunamiTest(testConfig TestConfig,nodeID string) {
 	fmt.Printf("Performing Tsunami test for TestID: %s\n", testConfig.TestID)
 
 	// Implement logic to perform Tsunami tests with delays between requests
@@ -186,7 +248,7 @@ func performTsunamiTest(testConfig TestConfig) {
 
 				// Create and publish metric message
 				metricMessage := MetricMessage{
-					NodeID:   testConfig.TestID,
+					NodeID:   nodeID,
 					TestID:   testConfig.TestID,
 					ReportID: testConfig.TestID,
 					NoOfReq:  req,
@@ -235,7 +297,7 @@ func performTsunamiTest(testConfig TestConfig) {
 }
 
 // Helper function to perform HTTP tests and send metrics at a fixed interval
-func performAvalancheTest(testConfig TestConfig) {
+func performAvalancheTest(testConfig TestConfig,nodeID string) {
 	// Example: Report metrics every 5 seconds
 
 	// interval := 10 * time.Millisecond
@@ -263,7 +325,7 @@ func performAvalancheTest(testConfig TestConfig) {
 
 				// Create and publish metric message
 				metricMessage := MetricMessage{
-					NodeID:   testConfig.TestID,
+					NodeID:   nodeID,
 					TestID:   testConfig.TestID,
 					ReportID: testConfig.TestID,
 					NoOfReq:  req,
