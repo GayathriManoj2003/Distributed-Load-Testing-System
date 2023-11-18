@@ -195,7 +195,7 @@ func performTsunamiTest(testConfig TestConfig) {
 	// Use a goroutine to periodically send metrics
 	go func() {
 		for {
-			time.Sleep(interval)
+			
 
 			if len(currentLatencies) > 0 {
 				allLatencies = append(allLatencies, currentLatencies...)
@@ -243,6 +243,7 @@ func performTsunamiTest(testConfig TestConfig) {
 		fmt.Printf("Request %d - Latency: %d ms\n", i, latency)
 		req++
 		currentLatencies = append(currentLatencies, latency)
+		time.Sleep(interval)
 	}
 
 	// Close the MetricProducer when done
