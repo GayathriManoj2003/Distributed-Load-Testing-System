@@ -14,7 +14,7 @@ const Dashboard = () => {
 
   const trigger = async () => {
     try {
-      await axios.post("http://localhost:8080/trigger");
+      await axios.post("http://localhost:8080/trigger", {"TestID": testID});
       // const res = await axios.post("http://localhost:8080/trigger");
       // console.log(testID);
       // console.log(res);
