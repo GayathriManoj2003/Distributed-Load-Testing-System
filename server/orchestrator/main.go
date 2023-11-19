@@ -98,6 +98,9 @@ type RequestBody struct {
 	TestMessageDelay int    `json:"TestMessageDelay"`
 	NumRequests      int    `json:"NumRequests"`
 }
+type RequestBodyTrigger struct {
+	TestID         string `json:"TestID"`
+}
 
 type TestConfig struct {
 	TestID         			string `json:"test_id"`
@@ -196,9 +199,17 @@ func main() {
 }
 
 func handleClientTrigger(w http.ResponseWriter, r *http.Request) {
+	var requestBody RequestBodyTrigger
+	err := json.NewDecoder(r.Body).Decode(&requestBody)
+	if err != nil {
+		fmt.Printf("Error decoding JSON: %v\n", err)
+		http.Error(w, "Bad Request", http.StatusBadRequest)
+		return
+	}
+	fmt.Printf("Received POST request with body: %+v\n", requestBody)
 	w.WriteHeader(http.StatusOK)
 	time.Sleep(time.Second * 3)
-	go metricsConsumer.HandleMetricsMessage()
+	prod.sendTriggerMessage(requestBody.TestID)
 }
 
 func handlePostTest(w http.ResponseWriter, r *http.Request) {
@@ -232,6 +243,7 @@ func handlePostTest(w http.ResponseWriter, r *http.Request) {
 	// Start Kafka-related operations asynchronously
 
 	go startKafkaStuff(Test_ID, requestBody)
+	go metricsConsumer.HandleMetricsMessage()
 }
 
 
@@ -246,8 +258,7 @@ func startKafkaStuff(Test_ID string, requestBody RequestBody) {
 	fmt.Printf("Test Config: %+v\n", testConfig)
 
 	prod.sendTestConfig(testConfig)
-	time.Sleep(time.Second * 1)
-	prod.sendTriggerMessage(Test_ID)
+	// time.Sleep(time.Second * 1)
 }
 
 func addCorsHeaders(handler http.Handler) http.Handler {

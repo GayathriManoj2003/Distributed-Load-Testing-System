@@ -65,7 +65,7 @@ func (mc *MetricsConsumer) consumeMetrics() {
 			mc.consumer.Close()
 			os.Exit(0)
 		default:
-			ev := mc.consumer.Poll(100)
+			ev := mc.consumer.Poll(50)
 			if ev == nil {
 				continue
 			}
@@ -139,7 +139,7 @@ func (mc *MetricsConsumer) processMetrics(metrics MetricsMessage) {
 	go SendMessageToClients(message)
 	// Check if the desired number of requests is met
 	if mc.totalNumRequests == 10 {
-		mc.calculateAndStoreAggregatedMetrics(key)
+		go mc.calculateAndStoreAggregatedMetrics(key)
 	}
 }
 
