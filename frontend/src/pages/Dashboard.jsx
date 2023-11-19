@@ -5,8 +5,9 @@ import "./Dashboard.scss"
 
 const Dashboard = () => {
   const [nodeStats, setNodeStats] = useState({});
-  const { testID } = useTestID();
+  const { testID, setTestID} = useTestID();
 
+  const CurTestID = testID
   useEffect(() => {
     trigger();
     // eslint-disable-next-line
