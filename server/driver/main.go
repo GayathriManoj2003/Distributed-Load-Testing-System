@@ -1,16 +1,17 @@
 package main
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"os"
 	"os/signal"
 	"sort"
+	"sync"
 	"syscall"
 	"time"
-	"crypto/rand"
-	"encoding/hex"
 
 	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
 )
@@ -38,6 +39,13 @@ type MetricMessage struct {
 	Metrics  MetricsData `json:"metrics"`
 }
 
+// Heartbeat structure
+type Heartbeat struct {
+	NodeID    string `json:"node_id"`
+	Heartbeat string `json:"heartbeat"`
+	Timestamp string `json:"timestamp"`
+}
+
 // MetricsData structure
 type MetricsData struct {
 	MeanLatency float64 `json:"mean_latency"`
@@ -48,6 +56,12 @@ type MetricProducer struct {
 	producer        *kafka.Producer
 	deliveryChannel chan kafka.Event
 }
+type HeartbeatProducer struct {
+	producer        *kafka.Producer
+	deliveryChannel chan kafka.Event
+}
+
+var current_latency_mutex sync.Mutex
 
 func generateUniqueToken() (string, error) {
 	randomBytes := make([]byte, 16)
@@ -75,9 +89,30 @@ func NewMetricProducer() *MetricProducer {
 		deliveryChannel: make(chan kafka.Event, 10000),
 	}
 }
+func NewHeartbeatProducer() *HeartbeatProducer {
+	p, err := kafka.NewProducer(&kafka.ConfigMap{
+		"bootstrap.servers": "localhost:9092",
+		"client.id":         "heartbeat-producer",
+	})
+
+	if err != nil {
+		fmt.Printf("Failed to create metric producer: %s\n", err)
+		os.Exit(1)
+	}
+
+	return &HeartbeatProducer{
+		producer:        p,
+		deliveryChannel: make(chan kafka.Event, 10000),
+	}
+}
 
 // Close closes the MetricProducer
 func (mp *MetricProducer) Close() {
+	mp.producer.Close()
+}
+
+// Close closes the HeartbeatProducer
+func (mp *HeartbeatProducer) Close() {
 	mp.producer.Close()
 }
 
@@ -106,14 +141,64 @@ func (mp *MetricProducer) PublishMetric(metricMessage MetricMessage) {
 
 	fmt.Printf("Published metric message:\n%s\n", jsonMessage)
 }
+func (hp *HeartbeatProducer) PublishHeartbeat(heartbeatMessage Heartbeat) {
+
+	jsonMessage, err := json.Marshal(heartbeatMessage)
+	if err != nil {
+		fmt.Printf("Error encoding heartbeat message: %v\n", err)
+		return
+	}
+
+	topic := "heartbeat"
+	err = hp.producer.Produce(&kafka.Message{
+		TopicPartition: kafka.TopicPartition{
+			Topic:     &topic,
+			Partition: kafka.PartitionAny,
+		},
+		Value: jsonMessage,
+	}, hp.deliveryChannel)
+
+	if err != nil {
+		fmt.Printf("Failed to produce heartbeat message: %v\n", err)
+		return
+	}
+	<-hp.deliveryChannel
+
+	fmt.Printf("Published heartbeat message:\n%s\n", jsonMessage)
+}
+func produceHeartbeat(done chan bool, nodeID string) {
+	// Infinite loop for continuous heartbeat production
+	heartbeatProducer := NewHeartbeatProducer()
+	for {
+		select {
+		case <-time.After(time.Second): // Produce heartbeat every second
+			heartbeat := Heartbeat{
+				NodeID:    nodeID,
+				Heartbeat: "YES",
+				Timestamp: time.Now().Format(time.RFC3339),
+			}
+			heartbeatJSON, err := json.Marshal(heartbeat)
+			if err != nil {
+				fmt.Println("Error encoding heartbeat:", err)
+				continue
+			}
+			fmt.Println(string(heartbeatJSON)) // Replace this with your logic to send the heartbeat
+			heartbeatProducer.PublishHeartbeat(heartbeat)
+		case <-done: // Signal to stop the goroutine
+			return
+		}
+	}
+}
 func main() {
+	done := make(chan bool)
+	// Generate nodeID
+	nodeID, err := generateUniqueToken()
+	go produceHeartbeat(done, nodeID)
 	topics := []string{"test_config", "trigger"}
 
 	// Create the producer for metric messages
 	metricProducer := NewMetricProducer()
 
-	// Generate nodeID
-	nodeID, err := generateUniqueToken()
 	if err != nil {
 		fmt.Println("Error generating unique token:", err)
 		os.Exit(1)
@@ -167,7 +252,7 @@ func main() {
 				case "trigger":
 					var triggerMessage TriggerMessage
 					if err := json.Unmarshal(e.Value, &triggerMessage); err == nil {
-						if triggerMessage.Trigger == "YES" {
+						if triggerMessage.Trigger == "YES" && triggerMessage.TestID == test.TestID {
 							if test.TestType == "Tsunami" {
 								performTsunamiTest(test, nodeID)
 							}
@@ -189,6 +274,8 @@ func main() {
 
 	fmt.Println("Closing consumer")
 	consumer.Close()
+	<-done
+	fmt.Println("Producer stopped.")
 }
 
 // Helper function to send registration messages
@@ -220,7 +307,7 @@ func sendRegistrationMessage(prod *MetricProducer, nodeID string) error {
 	return nil
 }
 
-func performTsunamiTest(testConfig TestConfig,nodeID string) {
+func performTsunamiTest(testConfig TestConfig, nodeID string) {
 	fmt.Printf("Performing Tsunami test for TestID: %s\n", testConfig.TestID)
 
 	// Implement logic to perform Tsunami tests with delays between requests
@@ -242,6 +329,7 @@ func performTsunamiTest(testConfig TestConfig,nodeID string) {
 		for {
 
 			if len(currentLatencies) > 0 {
+				current_latency_mutex.Lock()
 				allLatencies = append(allLatencies, currentLatencies...)
 
 				meanLatency, minLatency, maxLatency := calculateLatencyMetrics(allLatencies)
@@ -263,6 +351,7 @@ func performTsunamiTest(testConfig TestConfig,nodeID string) {
 				// Clear currentLatencies for the next interval
 				currentLatencies = nil
 				req = 0
+				current_latency_mutex.Unlock()
 			}
 		}
 	}()
@@ -284,8 +373,10 @@ func performTsunamiTest(testConfig TestConfig,nodeID string) {
 
 		// Print results
 		fmt.Printf("Request %d - Latency: %d ms\n", i, latency)
+		current_latency_mutex.Lock()
 		req++
 		currentLatencies = append(currentLatencies, latency)
+		current_latency_mutex.Unlock()
 		timer := time.After(interval)
 		<-timer // block until timer channel sends a value
 	}
@@ -297,7 +388,7 @@ func performTsunamiTest(testConfig TestConfig,nodeID string) {
 }
 
 // Helper function to perform HTTP tests and send metrics at a fixed interval
-func performAvalancheTest(testConfig TestConfig,nodeID string) {
+func performAvalancheTest(testConfig TestConfig, nodeID string) {
 	// Example: Report metrics every 5 seconds
 
 	// interval := 10 * time.Millisecond
@@ -319,6 +410,8 @@ func performAvalancheTest(testConfig TestConfig,nodeID string) {
 		for {
 
 			if len(currentLatencies) > 0 {
+				current_latency_mutex.Lock()
+
 				allLatencies = append(allLatencies, currentLatencies...)
 
 				meanLatency, minLatency, maxLatency := calculateLatencyMetrics(allLatencies)
@@ -340,6 +433,8 @@ func performAvalancheTest(testConfig TestConfig,nodeID string) {
 				// Clear currentLatencies for the next interval
 				currentLatencies = nil
 				req = 0
+				current_latency_mutex.Unlock()
+
 			}
 		}
 	}()
@@ -361,8 +456,11 @@ func performAvalancheTest(testConfig TestConfig,nodeID string) {
 
 		// Print results
 		fmt.Printf("Request %d - Latency: %d ms\n", i, latency)
+		current_latency_mutex.Lock()
 		req++
 		currentLatencies = append(currentLatencies, latency)
+		current_latency_mutex.Unlock()
+
 	}
 
 	// Close the MetricProducer when done
