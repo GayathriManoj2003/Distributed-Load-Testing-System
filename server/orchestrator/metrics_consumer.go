@@ -118,7 +118,7 @@ func (mc *MetricsConsumer) processMetrics(metrics MetricsMessage) {
 	mc.aggregatedMetrics[key].TotalRequests++
 	mc.aggregatedMetrics[key].MeanLatency += metrics.Metrics.MeanLatency
 	mc.aggregatedMetrics[key].MinLatency = math.Min(mc.aggregatedMetrics[key].MinLatency, metrics.Metrics.MinLatency)
-	fmt.Printf("%.2f\n",metrics.Metrics.MinLatency)
+	// fmt.Printf("%.2f\n",metrics.Metrics.MinLatency)
 	mc.aggregatedMetrics[key].MaxLatency = math.Max(mc.aggregatedMetrics[key].MaxLatency, metrics.Metrics.MaxLatency)
 
 	fmt.Printf("Received metrics for Test ID: %s, Node ID: %s, No of Requests: %d\n", metrics.TestID, metrics.NodeID, metrics.NoOfReq)
@@ -136,7 +136,7 @@ func (mc *MetricsConsumer) processMetrics(metrics MetricsMessage) {
 		return
 	}
 	message := string(json_bytes)
-	SendMessageToClients(message)
+	go SendMessageToClients(message)
 	// Check if the desired number of requests is met
 	if mc.totalNumRequests == 10 {
 		mc.calculateAndStoreAggregatedMetrics(key)

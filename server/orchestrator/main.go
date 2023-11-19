@@ -18,6 +18,46 @@ var upgrader = websocket.Upgrader{
 	},
 }
 
+var p *kafka.Producer
+var prod *Producer
+var consumer *kafka.Consumer
+var metricsConsumer *MetricsConsumer
+
+func init() {
+	var err error
+
+	// Initialize Kafka producer
+	p, err = kafka.NewProducer(&kafka.ConfigMap{
+		"bootstrap.servers": "localhost:9092",
+		"client.id":         "something",
+		"acks":              "all",
+	})
+	if err != nil {
+		fmt.Printf("Failed to create producer: %s\n", err)
+		os.Exit(1)
+	}
+
+	// Initialize Kafka consumer
+	consumer, err = kafka.NewConsumer(&kafka.ConfigMap{
+		"bootstrap.servers": "localhost:9092",
+		"group.id":          "metrics-consumer-group",
+		"auto.offset.reset": "earliest",
+	})
+	if err != nil {
+		fmt.Printf("Failed to create consumer: %s\n", err)
+		os.Exit(1)
+	}
+
+	// Create instances of Producer and MetricsConsumer
+	prod = CreateProducer(p)
+	metricsConsumer = CreateMetricsConsumer()
+	metricsConsumer.consumer = consumer
+
+	// Subscribe to Kafka topics
+	topics := "metrics"
+	consumer.Subscribe(topics, nil)
+}
+
 // WebSocketClients stores connected clients
 var WebSocketClients = make(map[*websocket.Conn]bool)
 
@@ -146,8 +186,15 @@ func (prod *Producer) sendTriggerMessage(TestID string) error {
 func main() {
 	http.HandleFunc("/ws", handleWebSocket)
 	http.HandleFunc("/ping", handlePostTest)
+	http.HandleFunc("/trigger", handleClientTrigger)
 	fmt.Println("Starting server on :8080...")
 	http.ListenAndServe(":8080", addCorsHeaders(http.DefaultServeMux))
+}
+
+func handleClientTrigger(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusOK)
+	time.Sleep(time.Second * 3)
+	go metricsConsumer.HandleMetricsMessage()
 }
 
 func handlePostTest(w http.ResponseWriter, r *http.Request) {
@@ -179,6 +226,7 @@ func handlePostTest(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte(Test_ID))
 
 	// Start Kafka-related operations asynchronously
+
 	go startKafkaStuff(Test_ID, requestBody)
 }
 
@@ -193,40 +241,11 @@ func startKafkaStuff(Test_ID string, requestBody RequestBody) {
 
 	fmt.Printf("Test Config: %+v\n", testConfig)
 
-	p, err := kafka.NewProducer(&kafka.ConfigMap{
-		"bootstrap.servers": "localhost:9092",
-		"client.id":         "something",
-		"acks":              "all",
-	})
-
-	consumer, err := kafka.NewConsumer(&kafka.ConfigMap{
-		"bootstrap.servers": "localhost:9092",
-		"group.id":          "metrics-consumer-group",
-		"auto.offset.reset": "earliest",
-	})
-
-	if err != nil {
-		fmt.Printf("Failed to create consumer: %s\n", err)
-		os.Exit(1)
-	}
-
-	if err != nil {
-		fmt.Printf("Failed to create producer: %s\n", err)
-		os.Exit(1)
-	}
-
-	prod := CreateProducer(p)
-
 	prod.sendTestConfig(testConfig)
+	time.Sleep(time.Second * 1)
 	prod.sendTriggerMessage(Test_ID)
-
-	topics := "metrics"
-	consumer.Subscribe(topics, nil)
-	metricsConsumer := CreateMetricsConsumer()
-	metricsConsumer.consumer = consumer
-
-	metricsConsumer.HandleMetricsMessage()
 }
+
 func addCorsHeaders(handler http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
