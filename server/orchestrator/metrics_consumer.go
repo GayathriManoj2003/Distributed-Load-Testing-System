@@ -54,6 +54,7 @@ type StoredAggregatedMetrics struct {
     MeanLatency   float64 
     MinLatency    float64 
     MaxLatency    float64 
+	NumNodes      int
 }
 
 func CreateMetricsConsumer() *MetricsConsumer {
@@ -160,6 +161,7 @@ func (mc *MetricsConsumer) calculateAndStoreAggregatedMetrics(key string) {
             MeanLatency:     mc.aggregatedMetrics[key].MeanLatency,
             MinLatency:      mc.aggregatedMetrics[key].MinLatency,
             MaxLatency:      mc.aggregatedMetrics[key].MaxLatency,
+			NumNodes:		 1,
         }
     } else {
         // Update the stored aggregated metrics
@@ -167,12 +169,15 @@ func (mc *MetricsConsumer) calculateAndStoreAggregatedMetrics(key string) {
         mc.storedAggregatedMetrics.MeanLatency += mc.aggregatedMetrics[key].MeanLatency
         mc.storedAggregatedMetrics.MinLatency = math.Min(mc.storedAggregatedMetrics.MinLatency, mc.aggregatedMetrics[key].MinLatency)
         mc.storedAggregatedMetrics.MaxLatency = math.Max(mc.storedAggregatedMetrics.MaxLatency, mc.aggregatedMetrics[key].MaxLatency)
+		mc.storedAggregatedMetrics.NumNodes += 1
     }
-		// Print the updated stored aggregated metrics
-		fmt.Printf("  Total Requests: %d\n", mc.storedAggregatedMetrics.TotalRequests)
-		fmt.Printf("  Mean Latency: %.2f ms\n", mc.storedAggregatedMetrics.MeanLatency)
-		fmt.Printf("  Min Latency: %.2f ms\n", mc.storedAggregatedMetrics.MinLatency)
-		fmt.Printf("  Max Latency: %.2f ms\n", mc.storedAggregatedMetrics.MaxLatency)
+
+	fmt.Printf("  Total Requests: %d\n", mc.storedAggregatedMetrics.TotalRequests)
+	fmt.Printf("  Mean Latency: %.2f ms\n", mc.storedAggregatedMetrics.MeanLatency)
+	fmt.Printf("  Min Latency: %.2f ms\n", mc.storedAggregatedMetrics.MinLatency)
+	fmt.Printf("  Max Latency: %.2f ms\n", mc.storedAggregatedMetrics.MaxLatency)
+	fmt.Printf("  Num Nodes: %d\n", mc.storedAggregatedMetrics.NumNodes)
+	fmt.Printf("  Max Nodes: %d\n", GetNumActiveNodes())
 
 	// Calculate mean values
 	mc.aggregatedMetrics[key].MeanLatency /= float64(mc.aggregatedMetrics[key].TotalRequests)
@@ -202,7 +207,7 @@ func (mc *MetricsConsumer) calculateAndStoreAggregatedMetrics(key string) {
 	}
 
 	// Save to a JSON file
-	fileName := fmt.Sprintf("Test_Reports/%s_metrics.json", mc.aggregatedMetrics[key].TestID)
+	fileName := fmt.Sprintf("Test_Reports/Node_Test_%s_%s_metrics.json", mc.aggregatedMetrics[key].TestID,mc.aggregatedMetrics[key].NodeID)
 	err = ioutil.WriteFile(fileName, jsonData, 0644)
 	if err != nil {
 		fmt.Printf("Error writing to file: %v\n", err)
@@ -210,6 +215,43 @@ func (mc *MetricsConsumer) calculateAndStoreAggregatedMetrics(key string) {
 	}
 
 	fmt.Printf("Aggregated metrics saved to %s\n", fileName)
+
+	if(mc.storedAggregatedMetrics.NumNodes >= GetNumActiveNodes()) {
+		mc.storedAggregatedMetrics.MeanLatency /= float64(GetNumActiveNodes())
+
+		storedAggregatedData := struct {
+			TestID  string                `json:"test_id"`
+			Metrics StoredAggregatedMetrics `json:"metrics"`
+		}{
+			TestID: mc.aggregatedMetrics[key].TestID,
+			Metrics: StoredAggregatedMetrics{
+				TotalRequests: mc.storedAggregatedMetrics.TotalRequests,
+				MeanLatency:   mc.storedAggregatedMetrics.MeanLatency,
+				MinLatency:    mc.storedAggregatedMetrics.MinLatency,
+				MaxLatency:    mc.storedAggregatedMetrics.MaxLatency,
+				NumNodes:      mc.storedAggregatedMetrics.NumNodes,
+			},
+		}
+	
+		// Convert to JSON
+		storedJsonData, err := json.Marshal(storedAggregatedData)
+		if err != nil {
+			fmt.Printf("Error encoding JSON: %v\n", err)
+			return
+		}
+		message := string(storedJsonData)
+		go SendMessageToClients(message)
+	
+		// Save to a JSON file
+		storedFileName := fmt.Sprintf("Final_Test_Reports/%s_metrics.json", mc.aggregatedMetrics[key].TestID)
+		err = ioutil.WriteFile(storedFileName, storedJsonData, 0644)
+		if err != nil {
+			fmt.Printf("Error writing to file: %v\n", err)
+			return
+		}
+	
+		fmt.Printf("Stored aggregated metrics saved to %s\n", storedFileName)
+	}
 }
 
 func (cons *MetricsConsumer) HandleMetricsMessage(requestBody RequestBody) {
