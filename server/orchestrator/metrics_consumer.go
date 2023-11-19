@@ -125,12 +125,11 @@ func (mc *MetricsConsumer) processMetrics(metrics MetricsMessage) {
 	}
 
 	// Add metrics values to the aggregated metrics
-	mc.aggregatedMetrics[key].TotalNumRequests+=metrics.NoOfReq
-	mc.aggregatedMetrics[key].TotalRequests++
-	mc.aggregatedMetrics[key].MeanLatency += metrics.Metrics.MeanLatency
-	mc.aggregatedMetrics[key].MinLatency = math.Min(mc.aggregatedMetrics[key].MinLatency, metrics.Metrics.MinLatency)
-	// fmt.Printf("%.2f\n",metrics.Metrics.MinLatency)
-	mc.aggregatedMetrics[key].MaxLatency = math.Max(mc.aggregatedMetrics[key].MaxLatency, metrics.Metrics.MaxLatency)
+	mc.aggregatedMetrics[key].TotalNumRequests += metrics.NoOfReq
+	mc.aggregatedMetrics[key].TotalRequests += metrics.NoOfReq
+	mc.aggregatedMetrics[key].MeanLatency = metrics.Metrics.MeanLatency
+	mc.aggregatedMetrics[key].MinLatency = metrics.Metrics.MinLatency
+	mc.aggregatedMetrics[key].MaxLatency = metrics.Metrics.MaxLatency
 
 	fmt.Printf("Received metrics for Test ID: %s, Node ID: %s, No of Requests: %d\n", metrics.TestID, metrics.NodeID, metrics.NoOfReq)
 	fmt.Printf("Aggregated Metrics:\n")
@@ -185,13 +184,13 @@ func (mc *MetricsConsumer) calculateAndStoreAggregatedMetrics(key string) {
 	}{
 		TestID: mc.aggregatedMetrics[key].TestID,
 		Metrics: AggregatedMetrics{
-			TotalRequests: mc.aggregatedMetrics[key].TotalRequests,
-			MeanLatency:   mc.aggregatedMetrics[key].MeanLatency,
-			MinLatency:    mc.aggregatedMetrics[key].MinLatency,
-			MaxLatency:    mc.aggregatedMetrics[key].MaxLatency,
-			TotalNumRequests: mc.aggregatedMetrics[key].TotalNumRequests,
-			TestID:        mc.aggregatedMetrics[key].TestID,
-			NodeID:        mc.aggregatedMetrics[key].NodeID,
+			TotalRequests: 		mc.aggregatedMetrics[key].TotalRequests,
+			MeanLatency:   		mc.aggregatedMetrics[key].MeanLatency,
+			MinLatency:    		mc.aggregatedMetrics[key].MinLatency,
+			MaxLatency:    		mc.aggregatedMetrics[key].MaxLatency,
+			TotalNumRequests: 	mc.aggregatedMetrics[key].TotalNumRequests,
+			TestID:        		mc.aggregatedMetrics[key].TestID,
+			NodeID:        		mc.aggregatedMetrics[key].NodeID,
 		},
 	}
 
@@ -203,7 +202,7 @@ func (mc *MetricsConsumer) calculateAndStoreAggregatedMetrics(key string) {
 	}
 
 	// Save to a JSON file
-	fileName := fmt.Sprintf("Test_Reports/%s_%s_metrics.json", mc.aggregatedMetrics[key].TestID, mc.aggregatedMetrics[key].NodeID)
+	fileName := fmt.Sprintf("Test_Reports/%s_metrics.json", mc.aggregatedMetrics[key].TestID)
 	err = ioutil.WriteFile(fileName, jsonData, 0644)
 	if err != nil {
 		fmt.Printf("Error writing to file: %v\n", err)
