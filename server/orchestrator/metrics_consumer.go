@@ -80,7 +80,7 @@ func (mc *MetricsConsumer) consumeMetrics() {
 				}
 
 				// Process metrics data
-				mc.processMetrics(metrics)
+				go mc.processMetrics(metrics)
 			case kafka.Error:
 				fmt.Fprintf(os.Stderr, "Error: %v\n", e)
 			}

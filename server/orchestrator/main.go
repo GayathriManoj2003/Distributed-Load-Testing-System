@@ -10,6 +10,7 @@ import (
 	"encoding/hex"
 	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
 	"github.com/gorilla/websocket"
+	"sync"
 )
 
 var upgrader = websocket.Upgrader{
@@ -22,6 +23,7 @@ var p *kafka.Producer
 var prod *Producer
 var consumer *kafka.Consumer
 var metricsConsumer *MetricsConsumer
+var wsMutex sync.Mutex
 
 func init() {
 	var err error
@@ -62,6 +64,8 @@ func init() {
 var WebSocketClients = make(map[*websocket.Conn]bool)
 
 func SendMessageToClients(message string) {
+	wsMutex.Lock()
+	defer wsMutex.Unlock()
 	for client := range WebSocketClients {
 		err := client.WriteMessage(websocket.TextMessage, []byte(message))
 		if err != nil {
@@ -81,12 +85,12 @@ func handleWebSocket(w http.ResponseWriter, r *http.Request) {
 	defer conn.Close()
 
 	// Add the client to the WebSocketClients map
+	wsMutex.Lock()
 	WebSocketClients[conn] = true
+	wsMutex.Unlock()
 
 	for {
-		// Keep the connection open for further communication
-		// You can extend this loop to handle incoming messages from clients
-		time.Sleep(time.Second)
+		time.Sleep(time.Millisecond*50)
 	}
 }
 type RequestBody struct {
