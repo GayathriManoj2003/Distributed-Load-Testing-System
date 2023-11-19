@@ -7,9 +7,9 @@ import { TestIDProvider } from './context/TestIDContext';
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(
   <TestIDProvider>
-    <React.StrictMode>
+    {/* <React.StrictMode> */}
       <App />
-    </React.StrictMode>
+    {/* </React.StrictMode> */}
   </TestIDProvider>
 );
 
