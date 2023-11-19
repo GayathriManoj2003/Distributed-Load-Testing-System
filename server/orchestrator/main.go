@@ -243,7 +243,7 @@ func handlePostTest(w http.ResponseWriter, r *http.Request) {
 	// Start Kafka-related operations asynchronously
 
 	go startKafkaStuff(Test_ID, requestBody)
-	go metricsConsumer.HandleMetricsMessage()
+	go metricsConsumer.HandleMetricsMessage(requestBody)
 }
 
 

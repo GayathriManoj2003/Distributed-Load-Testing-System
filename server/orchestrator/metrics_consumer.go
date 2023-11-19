@@ -45,12 +45,22 @@ type MetricsConsumer struct {
 	totalNumRequests   int
 	metricsLock        sync.Mutex
 	wsConn             *websocket.Conn 
+	requestBody        RequestBody
+	storedAggregatedMetrics *StoredAggregatedMetrics
+}
+
+type StoredAggregatedMetrics struct {
+    TotalRequests int     
+    MeanLatency   float64 
+    MinLatency    float64 
+    MaxLatency    float64 
 }
 
 func CreateMetricsConsumer() *MetricsConsumer {
 	return &MetricsConsumer{
 		aggregatedMetrics: make(map[string]*AggregatedMetrics),
 		wsConn:            nil,
+		storedAggregatedMetrics:  nil,
 	}
 }
 
@@ -115,6 +125,7 @@ func (mc *MetricsConsumer) processMetrics(metrics MetricsMessage) {
 	}
 
 	// Add metrics values to the aggregated metrics
+	mc.aggregatedMetrics[key].TotalNumRequests+=metrics.NoOfReq
 	mc.aggregatedMetrics[key].TotalRequests++
 	mc.aggregatedMetrics[key].MeanLatency += metrics.Metrics.MeanLatency
 	mc.aggregatedMetrics[key].MinLatency = math.Min(mc.aggregatedMetrics[key].MinLatency, metrics.Metrics.MinLatency)
@@ -138,12 +149,32 @@ func (mc *MetricsConsumer) processMetrics(metrics MetricsMessage) {
 	message := string(json_bytes)
 	go SendMessageToClients(message)
 	// Check if the desired number of requests is met
-	if mc.totalNumRequests == 10 {
+	if mc.aggregatedMetrics[key].TotalNumRequests == mc.requestBody.NumRequests {
 		go mc.calculateAndStoreAggregatedMetrics(key)
 	}
 }
 
 func (mc *MetricsConsumer) calculateAndStoreAggregatedMetrics(key string) {
+	if mc.storedAggregatedMetrics == nil {
+        mc.storedAggregatedMetrics = &StoredAggregatedMetrics{
+            TotalRequests:   mc.aggregatedMetrics[key].TotalRequests,
+            MeanLatency:     mc.aggregatedMetrics[key].MeanLatency,
+            MinLatency:      mc.aggregatedMetrics[key].MinLatency,
+            MaxLatency:      mc.aggregatedMetrics[key].MaxLatency,
+        }
+    } else {
+        // Update the stored aggregated metrics
+        mc.storedAggregatedMetrics.TotalRequests += mc.aggregatedMetrics[key].TotalRequests
+        mc.storedAggregatedMetrics.MeanLatency += mc.aggregatedMetrics[key].MeanLatency
+        mc.storedAggregatedMetrics.MinLatency = math.Min(mc.storedAggregatedMetrics.MinLatency, mc.aggregatedMetrics[key].MinLatency)
+        mc.storedAggregatedMetrics.MaxLatency = math.Max(mc.storedAggregatedMetrics.MaxLatency, mc.aggregatedMetrics[key].MaxLatency)
+    }
+		// Print the updated stored aggregated metrics
+		fmt.Printf("  Total Requests: %d\n", mc.storedAggregatedMetrics.TotalRequests)
+		fmt.Printf("  Mean Latency: %.2f ms\n", mc.storedAggregatedMetrics.MeanLatency)
+		fmt.Printf("  Min Latency: %.2f ms\n", mc.storedAggregatedMetrics.MinLatency)
+		fmt.Printf("  Max Latency: %.2f ms\n", mc.storedAggregatedMetrics.MaxLatency)
+
 	// Calculate mean values
 	mc.aggregatedMetrics[key].MeanLatency /= float64(mc.aggregatedMetrics[key].TotalRequests)
 
@@ -182,7 +213,8 @@ func (mc *MetricsConsumer) calculateAndStoreAggregatedMetrics(key string) {
 	fmt.Printf("Aggregated metrics saved to %s\n", fileName)
 }
 
-func (cons *MetricsConsumer) HandleMetricsMessage() {
+func (cons *MetricsConsumer) HandleMetricsMessage(requestBody RequestBody) {
 	fmt.Println("Metrics Consumer started...")
+	cons.requestBody=requestBody
 	cons.consumeMetrics()
 }
