@@ -128,7 +128,7 @@ func main() {
 
 	consumer, err := kafka.NewConsumer(&kafka.ConfigMap{
 		"bootstrap.servers": "localhost:9092",
-		"group.id":          "my-group",
+		"group.id":          nodeID,
 		"auto.offset.reset": "earliest",
 	})
 
