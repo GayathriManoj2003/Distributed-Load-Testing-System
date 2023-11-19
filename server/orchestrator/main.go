@@ -191,6 +191,8 @@ func (prod *Producer) sendTriggerMessage(TestID string) error {
 }
 
 func main() {
+	go HandleRegisterTopic()
+	go HandleHeartbeatTopic()
 	http.HandleFunc("/ws", handleWebSocket)
 	http.HandleFunc("/ping", handlePostTest)
 	http.HandleFunc("/trigger", handleClientTrigger)
