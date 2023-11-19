@@ -9,13 +9,15 @@ const Dashboard = () => {
 
   useEffect(() => {
     trigger();
+    // eslint-disable-next-line
   }, []);
 
   const trigger = async () => {
     try {
-      const res = await axios.post("http://localhost:8080/trigger");
-      console.log(testID);
-      console.log(res);
+      await axios.post("http://localhost:8080/trigger");
+      // const res = await axios.post("http://localhost:8080/trigger");
+      // console.log(testID);
+      // console.log(res);
     } catch (err) {
       console.log(err);
     }
@@ -26,17 +28,18 @@ const Dashboard = () => {
 
     socket.onmessage = (event) => {
       const parsed_json = JSON.parse(event.data);
-      const { TestID, NodeID, MeanLatency, MinLatency, MaxLatency } = parsed_json;
-
+      const { TestID, NodeID, TotalRequests, MeanLatency, MinLatency, MaxLatency } = parsed_json;
+      console.log(parsed_json)
       if (testID === TestID) {
         setNodeStats((prevNodeStats) => {
           // Update the stats for the specific NodeID
           return {
             ...prevNodeStats,
             [NodeID]: {
-              mean: MeanLatency,
+              mean: MeanLatency/TotalRequests,
               min: MinLatency,
               max: MaxLatency,
+              total: TotalRequests,
             },
           };
         });
@@ -62,6 +65,7 @@ const Dashboard = () => {
               <p>Mean Latency: {nodeStats[nodeID].mean}</p>
               <p>Min Latency: {nodeStats[nodeID].min}</p>
               <p>Max Latency: {nodeStats[nodeID].max}</p>
+              <p>Total Requests: {nodeStats[nodeID].total}</p>
             </div>
           </div>
         ))}
