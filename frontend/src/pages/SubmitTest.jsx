@@ -63,7 +63,7 @@ const SubmitTest = () => {
                         />
                         <input required type="number" min="1"
                          name = "NumRequests" 
-                         placeholder = "Number of Requests per Second" 
+                         placeholder = "Number of Requests per Driver Node" 
                          onChange={handleChange} />
                         {err && <p className='error'> Error: {err}</p>}
                         <button type="submit">Submit Test</button>
