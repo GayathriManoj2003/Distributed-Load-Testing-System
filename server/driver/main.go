@@ -164,7 +164,7 @@ func (hp *HeartbeatProducer) PublishHeartbeat(heartbeatMessage Heartbeat) {
 	}
 	<-hp.deliveryChannel
 
-	fmt.Printf("Published heartbeat message:\n%s\n", jsonMessage)
+	// fmt.Printf("Published heartbeat message:\n%s\n", jsonMessage)
 }
 func produceHeartbeat(done chan bool, nodeID string) {
 	// Infinite loop for continuous heartbeat production
@@ -177,12 +177,12 @@ func produceHeartbeat(done chan bool, nodeID string) {
 				Heartbeat: "YES",
 				Timestamp: time.Now().Format(time.RFC3339),
 			}
-			heartbeatJSON, err := json.Marshal(heartbeat)
-			if err != nil {
-				fmt.Println("Error encoding heartbeat:", err)
-				continue
-			}
-			fmt.Println(string(heartbeatJSON)) // Replace this with your logic to send the heartbeat
+			// heartbeatJSON, err := json.Marshal(heartbeat)
+			// if err != nil {
+			// 	fmt.Println("Error encoding heartbeat:", err)
+			// 	continue
+			// }
+			// fmt.Println(string(heartbeatJSON)) // Replace this with your logic to send the heartbeat
 			heartbeatProducer.PublishHeartbeat(heartbeat)
 		case <-done: // Signal to stop the goroutine
 			return
