@@ -16,6 +16,10 @@ type Heartbeat struct {
 	Timestamp string `json:"timestamp"`
 }
 
+type FailureMessage struct {
+	NodeID string `json:"NodeID"`
+}
+
 func HandleHeartbeatRegisterTopics() {
 
 	var err error
@@ -52,6 +56,18 @@ func HandleHeartbeatRegisterTopics() {
 					delete(NodeIDList.list, nodeID)
 					NodeIDList.Unlock()
 					NodeIDList.RLock()
+					
+					nodeIDMessage := FailureMessage{NodeID: nodeID}
+
+					// Marshal the struct into a JSON-formatted string
+					jsonData, err := json.Marshal(nodeIDMessage)
+					if err != nil {
+						fmt.Printf("Error encoding JSON: %v\n", err)
+						return
+					}
+					message := string(jsonData)
+					// formattedString := fmt.Sprintf("{'NodeID': '%s'}", nodeID)
+					go SendMessageToClients(message)
 					fmt.Printf("NodeID %s removed from the list\n", nodeID)
 				}
 			}

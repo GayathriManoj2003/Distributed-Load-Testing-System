@@ -93,6 +93,10 @@
                 align-items: center;
             }
         }
+        
+    }
+    .greyed-out {
+        opacity: 0.5; /* You can adjust the opacity or add other styles as needed */
     }
     .nav-button{
         margin: 10px;

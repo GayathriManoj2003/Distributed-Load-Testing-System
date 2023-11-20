@@ -1,5 +1,5 @@
 import axios from 'axios';
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useTestID } from '../context/TestIDContext';
 import "./Dashboard.scss"
 import { useNavigate } from 'react-router-dom';
@@ -41,10 +41,10 @@ const Dashboard = () => {
       const numKeyValuePairs = Object.keys(parsed_json).length;
 
 
-      if(numKeyValuePairs == 2) {
+      if(numKeyValuePairs === 2) {
         console.log(numKeyValuePairs, parsed_json)
         const {test_id, metrics} = parsed_json;
-        if(test_id == testID) {
+        if(test_id === testID) {
           setFinalStats(metrics)
           console.log("Final", metrics)
           setTestID(null)
@@ -54,22 +54,38 @@ const Dashboard = () => {
           };
         }
       }
-
-      const { TestID, NodeID, TotalRequests, MeanLatency, MinLatency, MaxLatency } = parsed_json;
-      // console.log(parsed_json)
-      if (testID === TestID) {
+      if(numKeyValuePairs === 1) {
+        console.log(numKeyValuePairs, parsed_json)
+        const {NodeID} = parsed_json;
         setNodeStats((prevNodeStats) => {
-          // Update the stats for the specific NodeID
-          return {
+          // Update only the status attribute for the specific NodeID
+          const updatedNodeStats = {
             ...prevNodeStats,
             [NodeID]: {
-              mean: parseFloat(MeanLatency).toFixed(2),
-              min: MinLatency,
-              max: MaxLatency,
-              total: TotalRequests,
+              ...prevNodeStats[NodeID],
+              status: 0,
             },
           };
+          return updatedNodeStats;
         });
+      } else {
+        const { TestID, NodeID, TotalRequests, MeanLatency, MinLatency, MaxLatency } = parsed_json;
+        // console.log(parsed_json)
+        if (testID === TestID) {
+          setNodeStats((prevNodeStats) => {
+            // Update the stats for the specific NodeID
+            return {
+              ...prevNodeStats,
+              [NodeID]: {
+                mean: parseFloat(MeanLatency).toFixed(2),
+                min: MinLatency,
+                max: MaxLatency,
+                total: TotalRequests,
+                status: 1,
+              },
+            };
+          });
+        }
       }
     };
 
@@ -77,6 +93,7 @@ const Dashboard = () => {
       // Clean up the WebSocket connection when the component unmounts
       socket.close();
     };
+    // eslint-disable-next-line
   }, [testID]);
 
   return (
@@ -100,8 +117,11 @@ const Dashboard = () => {
       <div className='nodestats'>
         <h2>Driver Node Statistics</h2>
         {Object.keys(nodeStats).map((nodeID) => (
-          <div key={nodeID} className='nodeDetails'>
-            <span>Node ID: {nodeID}</span>
+          <div
+          key={nodeID}
+          className={`nodeDetails ${nodeStats[nodeID].status === 0 ? 'greyed-out' : ''}`}
+        >
+            <span>Node ID: {nodeID}   {!nodeStats[nodeID].status && (<span>---Inactive</span>)}</span>
             <div className='metrics'>
               <p>Mean Latency: {nodeStats[nodeID].mean}</p>
               <p>Min Latency: {nodeStats[nodeID].min}</p>
