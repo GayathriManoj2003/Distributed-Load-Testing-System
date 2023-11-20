@@ -12,8 +12,8 @@ const Home = () => {
          Our architecture, featuring Orchestrator and Driver nodes, 
          leverages Kafka for seamless communication.
           Users can choose between Tsunami and Avalanche testing modes, 
-          tailoring their load tests for optimal results.
-           With dynamic node registration and the ability to specify target throughput,
+          tailoring their load tests.
+           With dynamic node registration and the ability to specify number of requests per driver node,
             our system offers flexibility and scalability.
          Experience the future of web server load testing—efficient,
           dynamic, and orchestrated seamlessly through Kafka. 
