@@ -176,9 +176,6 @@ func (mc *MetricsConsumer) calculateAndStoreAggregatedMetrics(key string) {
 	fmt.Printf("*****************************************************************************************************************************************\n")
 
 
-	// Calculate mean values
-	mc.aggregatedMetrics[key].MeanLatency /= float64(mc.aggregatedMetrics[key].TotalRequests)
-
 	// Create a struct to hold the aggregated metrics
 	aggregatedData := struct {
 		TestID  string      `json:"test_id"`
