@@ -124,14 +124,10 @@ func (mc *MetricsConsumer) processMetrics(metrics MetricsMessage) {
 	mc.aggregatedMetrics[key].MinLatency = metrics.Metrics.MinLatency
 	mc.aggregatedMetrics[key].MaxLatency = metrics.Metrics.MaxLatency
 
+	fmt.Printf("\n~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n")
 	fmt.Printf("Received metrics for Test ID: %s, Node ID: %s, No of Requests: %d\n", metrics.TestID, metrics.NodeID, metrics.NoOfReq)
-	fmt.Printf("Aggregated Metrics:\n")
-	fmt.Printf("Updated Aggregated Metrics:\n")
-	fmt.Printf("  Test ID: %s\n", key)
-	fmt.Printf("  Total Requests: %d\n", mc.aggregatedMetrics[key].TotalRequests)
-	fmt.Printf("  Mean Latency: %.2f ms\n", mc.aggregatedMetrics[key].MeanLatency)
-	fmt.Printf("  Min Latency: %.2f ms\n", mc.aggregatedMetrics[key].MinLatency)
-	fmt.Printf("  Max Latency: %.2f ms\n", mc.aggregatedMetrics[key].MaxLatency)
+	fmt.Printf("Total Requests: %d\n", mc.aggregatedMetrics[key].TotalRequests)
+	fmt.Printf("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n")
 
 	json_bytes, err := json.Marshal(mc.aggregatedMetrics[key])
 	if err != nil {
@@ -167,12 +163,18 @@ func (mc *MetricsConsumer) calculateAndStoreAggregatedMetrics(key string) {
 		mc.storedAggregatedMetrics[mc.aggregatedMetrics[key].TestID].NumNodes += 1
 	}
 
+	fmt.Printf("\n*****************************************************************************************************************************************\n")
+	fmt.Printf("Final Metrics : \n")
+	fmt.Printf(" Test ID : %s\n",mc.aggregatedMetrics[key].TestID)
+	fmt.Printf(" Node ID : %s\n",mc.aggregatedMetrics[key].NodeID)
 	fmt.Printf("  Total Requests: %d\n", mc.storedAggregatedMetrics[mc.aggregatedMetrics[key].TestID].TotalRequests)
 	fmt.Printf("  Mean Latency: %.2f ms\n", mc.storedAggregatedMetrics[mc.aggregatedMetrics[key].TestID].MeanLatency)
 	fmt.Printf("  Min Latency: %.2f ms\n", mc.storedAggregatedMetrics[mc.aggregatedMetrics[key].TestID].MinLatency)
 	fmt.Printf("  Max Latency: %.2f ms\n", mc.storedAggregatedMetrics[mc.aggregatedMetrics[key].TestID].MaxLatency)
 	fmt.Printf("  Num Nodes: %d\n", mc.storedAggregatedMetrics[mc.aggregatedMetrics[key].TestID].NumNodes)
 	fmt.Printf("  Max Nodes: %d\n", GetNumActiveNodes())
+	fmt.Printf("*****************************************************************************************************************************************\n")
+
 
 	// Calculate mean values
 	mc.aggregatedMetrics[key].MeanLatency /= float64(mc.aggregatedMetrics[key].TotalRequests)

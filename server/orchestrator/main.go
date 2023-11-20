@@ -190,7 +190,9 @@ func (prod *Producer) sendTriggerMessage(TestID string) error {
 	}
 	<-prod.deliveryChannel
 
+	fmt.Printf("\n**********************************************************************\n")
 	fmt.Printf("Trigger message sent for Test ID: %s\n", TestID)
+	fmt.Printf("**********************************************************************\n")
 	return nil
 }
 
@@ -210,7 +212,7 @@ func handleClientTrigger(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Bad Request", http.StatusBadRequest)
 		return
 	}
-	fmt.Printf("Received POST request with body: %+v\n", requestBody)
+	// fmt.Printf("Received POST request with body: %+v\n", requestBody)
 	w.WriteHeader(http.StatusOK)
 	time.Sleep(time.Second * 3)
 	prod.sendTriggerMessage(requestBody.TestID)
@@ -237,8 +239,10 @@ func handlePostTest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	fmt.Printf("\n~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n")
 	fmt.Printf("Received POST request with body: %+v\n", requestBody)
 	fmt.Println("Test_ID:", Test_ID)
+	fmt.Printf("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n")
 
 	// Send the response to the client
 	w.WriteHeader(http.StatusOK)
@@ -259,7 +263,10 @@ func startKafkaStuff(Test_ID string, requestBody RequestBody) {
 		MessageCountPerDriver: requestBody.NumRequests,
 	}
 
+	fmt.Printf("\n***************************************************************************************************************\n")
 	fmt.Printf("Test Config: %+v\n", testConfig)
+	fmt.Printf("*****************************************************************************************************************\n")
+
 
 	prod.sendTestConfig(testConfig)
 	// time.Sleep(time.Second * 1)

@@ -28,10 +28,15 @@ func ProcessRegistrationMessage(message []byte) error {
 	// Add the NodeID to the list
 	NodeIDList.Lock()
 	NodeIDList.list[regMessage.NodeID] = time.Now()
-	fmt.Printf("Node ID list: %v\n", NodeIDList.list)
+	// fmt.Printf("Node ID list: %v\n", NodeIDList.list)
 	NodeIDList.Unlock()
 
+	fmt.Printf("\n~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n")
 	fmt.Printf("Received registration message. Node ID: %s\n", regMessage.NodeID)
+	fmt.Printf("The Driver Nodes Registered Currents Are : ")
+	fmt.Printf("%v\n", NodeIDList.list)
+	fmt.Printf("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n")
+
 
 	return nil
 }

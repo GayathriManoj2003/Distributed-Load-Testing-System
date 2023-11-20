@@ -68,7 +68,9 @@ func HandleHeartbeatRegisterTopics() {
 					message := string(jsonData)
 					// formattedString := fmt.Sprintf("{'NodeID': '%s'}", nodeID)
 					go SendMessageToClients(message)
+					fmt.Printf("\n~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n")
 					fmt.Printf("NodeID %s removed from the list\n", nodeID)
+					fmt.Printf("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n")
 				}
 			}
 			NodeIDList.RUnlock()
