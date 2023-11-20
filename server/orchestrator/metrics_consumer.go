@@ -46,7 +46,7 @@ type MetricsConsumer struct {
 	metricsLock        sync.Mutex
 	wsConn             *websocket.Conn 
 	requestBody        RequestBody
-	storedAggregatedMetrics *StoredAggregatedMetrics
+	storedAggregatedMetrics map[string]*StoredAggregatedMetrics
 }
 
 type StoredAggregatedMetrics struct {
@@ -61,7 +61,7 @@ func CreateMetricsConsumer() *MetricsConsumer {
 	return &MetricsConsumer{
 		aggregatedMetrics: make(map[string]*AggregatedMetrics),
 		wsConn:            nil,
-		storedAggregatedMetrics:  nil,
+		storedAggregatedMetrics:  make(map[string]*StoredAggregatedMetrics),
 	}
 }
 
@@ -155,28 +155,31 @@ func (mc *MetricsConsumer) processMetrics(metrics MetricsMessage) {
 }
 
 func (mc *MetricsConsumer) calculateAndStoreAggregatedMetrics(key string) {
-	if mc.storedAggregatedMetrics == nil {
-        mc.storedAggregatedMetrics = &StoredAggregatedMetrics{
-            TotalRequests:   mc.aggregatedMetrics[key].TotalRequests,
-            MeanLatency:     mc.aggregatedMetrics[key].MeanLatency,
-            MinLatency:      mc.aggregatedMetrics[key].MinLatency,
-            MaxLatency:      mc.aggregatedMetrics[key].MaxLatency,
-			NumNodes:		 1,
-        }
-    } else {
-        // Update the stored aggregated metrics
-        mc.storedAggregatedMetrics.TotalRequests += mc.aggregatedMetrics[key].TotalRequests
-        mc.storedAggregatedMetrics.MeanLatency += mc.aggregatedMetrics[key].MeanLatency
-        mc.storedAggregatedMetrics.MinLatency = math.Min(mc.storedAggregatedMetrics.MinLatency, mc.aggregatedMetrics[key].MinLatency)
-        mc.storedAggregatedMetrics.MaxLatency = math.Max(mc.storedAggregatedMetrics.MaxLatency, mc.aggregatedMetrics[key].MaxLatency)
-		mc.storedAggregatedMetrics.NumNodes += 1
-    }
+	mc.metricsLock.Lock()
+	defer mc.metricsLock.Unlock()
 
-	fmt.Printf("  Total Requests: %d\n", mc.storedAggregatedMetrics.TotalRequests)
-	fmt.Printf("  Mean Latency: %.2f ms\n", mc.storedAggregatedMetrics.MeanLatency)
-	fmt.Printf("  Min Latency: %.2f ms\n", mc.storedAggregatedMetrics.MinLatency)
-	fmt.Printf("  Max Latency: %.2f ms\n", mc.storedAggregatedMetrics.MaxLatency)
-	fmt.Printf("  Num Nodes: %d\n", mc.storedAggregatedMetrics.NumNodes)
+	if mc.storedAggregatedMetrics[mc.aggregatedMetrics[key].TestID] == nil {
+		mc.storedAggregatedMetrics[mc.aggregatedMetrics[key].TestID] = &StoredAggregatedMetrics{
+			TotalRequests: mc.aggregatedMetrics[key].TotalRequests,
+			MeanLatency:   mc.aggregatedMetrics[key].MeanLatency,
+			MinLatency:    mc.aggregatedMetrics[key].MinLatency,
+			MaxLatency:    mc.aggregatedMetrics[key].MaxLatency,
+			NumNodes:      1,
+		}
+	} else {
+        // Update the stored aggregated metrics
+        mc.storedAggregatedMetrics[mc.aggregatedMetrics[key].TestID].TotalRequests += mc.aggregatedMetrics[key].TotalRequests
+		mc.storedAggregatedMetrics[mc.aggregatedMetrics[key].TestID].MeanLatency += mc.aggregatedMetrics[key].MeanLatency
+		mc.storedAggregatedMetrics[mc.aggregatedMetrics[key].TestID].MinLatency = math.Min(mc.storedAggregatedMetrics[mc.aggregatedMetrics[key].TestID].MinLatency, mc.aggregatedMetrics[key].MinLatency)
+		mc.storedAggregatedMetrics[mc.aggregatedMetrics[key].TestID].MaxLatency = math.Max(mc.storedAggregatedMetrics[mc.aggregatedMetrics[key].TestID].MaxLatency, mc.aggregatedMetrics[key].MaxLatency)
+		mc.storedAggregatedMetrics[mc.aggregatedMetrics[key].TestID].NumNodes += 1
+	}
+
+	fmt.Printf("  Total Requests: %d\n", mc.storedAggregatedMetrics[mc.aggregatedMetrics[key].TestID].TotalRequests)
+	fmt.Printf("  Mean Latency: %.2f ms\n", mc.storedAggregatedMetrics[mc.aggregatedMetrics[key].TestID].MeanLatency)
+	fmt.Printf("  Min Latency: %.2f ms\n", mc.storedAggregatedMetrics[mc.aggregatedMetrics[key].TestID].MinLatency)
+	fmt.Printf("  Max Latency: %.2f ms\n", mc.storedAggregatedMetrics[mc.aggregatedMetrics[key].TestID].MaxLatency)
+	fmt.Printf("  Num Nodes: %d\n", mc.storedAggregatedMetrics[mc.aggregatedMetrics[key].TestID].NumNodes)
 	fmt.Printf("  Max Nodes: %d\n", GetNumActiveNodes())
 
 	// Calculate mean values
@@ -216,8 +219,8 @@ func (mc *MetricsConsumer) calculateAndStoreAggregatedMetrics(key string) {
 
 	fmt.Printf("Aggregated metrics saved to %s\n", fileName)
 
-	if(mc.storedAggregatedMetrics.NumNodes >= GetNumActiveNodes()) {
-		mc.storedAggregatedMetrics.MeanLatency /= float64(GetNumActiveNodes())
+	if(mc.storedAggregatedMetrics[mc.aggregatedMetrics[key].TestID].NumNodes >= GetNumActiveNodes()) {
+		mc.storedAggregatedMetrics[mc.aggregatedMetrics[key].TestID].MeanLatency /= float64(GetNumActiveNodes())
 
 		storedAggregatedData := struct {
 			TestID  string                `json:"test_id"`
@@ -225,11 +228,11 @@ func (mc *MetricsConsumer) calculateAndStoreAggregatedMetrics(key string) {
 		}{
 			TestID: mc.aggregatedMetrics[key].TestID,
 			Metrics: StoredAggregatedMetrics{
-				TotalRequests: mc.storedAggregatedMetrics.TotalRequests,
-				MeanLatency:   mc.storedAggregatedMetrics.MeanLatency,
-				MinLatency:    mc.storedAggregatedMetrics.MinLatency,
-				MaxLatency:    mc.storedAggregatedMetrics.MaxLatency,
-				NumNodes:      mc.storedAggregatedMetrics.NumNodes,
+				TotalRequests: mc.storedAggregatedMetrics[mc.aggregatedMetrics[key].TestID].TotalRequests,
+				MeanLatency:   mc.storedAggregatedMetrics[mc.aggregatedMetrics[key].TestID].MeanLatency,
+				MinLatency:    mc.storedAggregatedMetrics[mc.aggregatedMetrics[key].TestID].MinLatency,
+				MaxLatency:    mc.storedAggregatedMetrics[mc.aggregatedMetrics[key].TestID].MaxLatency,
+				NumNodes:      mc.storedAggregatedMetrics[mc.aggregatedMetrics[key].TestID].NumNodes,
 			},
 		}
 	
