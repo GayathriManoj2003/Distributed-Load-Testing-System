@@ -11,7 +11,6 @@ import (
 	"syscall"
 
 	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
-	"github.com/gorilla/websocket"
 )
 
 type MetricsData struct {
@@ -44,7 +43,6 @@ type MetricsConsumer struct {
 	aggregatedRequests int
 	totalNumRequests   int
 	metricsLock        sync.Mutex
-	wsConn             *websocket.Conn 
 	requestBody        RequestBody
 	storedAggregatedMetrics map[string]*StoredAggregatedMetrics
 }
@@ -60,7 +58,6 @@ type StoredAggregatedMetrics struct {
 func CreateMetricsConsumer() *MetricsConsumer {
 	return &MetricsConsumer{
 		aggregatedMetrics: make(map[string]*AggregatedMetrics),
-		wsConn:            nil,
 		storedAggregatedMetrics:  make(map[string]*StoredAggregatedMetrics),
 	}
 }
@@ -80,30 +77,25 @@ func (mc *MetricsConsumer) consumeMetrics() {
 			if ev == nil {
 				continue
 			}
-
 			switch e := ev.(type) {
-			case *kafka.Message:
-				var metrics MetricsMessage
-				err := json.Unmarshal(e.Value, &metrics)
-				if err != nil {
-					fmt.Printf("Error decoding metrics JSON: %v\n", err)
-					continue
-				}
+				case *kafka.Message:
+					switch *e.TopicPartition.Topic {
+						case "metrics":
+							var metrics MetricsMessage
+							err := json.Unmarshal(e.Value, &metrics)
+							if err != nil {
+								fmt.Printf("Error decoding metrics JSON: %v\n", err)
+								continue
+							}
+							go mc.processMetrics(metrics) 
+					}
 
-				// Process metrics data
-				go mc.processMetrics(metrics)
-			case kafka.Error:
-				fmt.Fprintf(os.Stderr, "Error: %v\n", e)
+					// Process metrics data
+				case kafka.Error:
+					fmt.Fprintf(os.Stderr, "Error: %v\n", e)
 			}
 		}
 	}
-}
-
-func (mc *MetricsConsumer) setWebSocketConnection(conn *websocket.Conn) {
-    mc.metricsLock.Lock()
-    defer mc.metricsLock.Unlock()
-
-    mc.wsConn = conn
 }
 
 func (mc *MetricsConsumer) processMetrics(metrics MetricsMessage) {

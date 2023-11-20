@@ -1,13 +1,12 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
-
+	"encoding/json"
 	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
 )
 
@@ -17,25 +16,26 @@ type Heartbeat struct {
 	Timestamp string `json:"timestamp"`
 }
 
-func HandleHeartbeatTopic() {
-	consumer, err := kafka.NewConsumer(&kafka.ConfigMap{
+func HandleHeartbeatRegisterTopics() {
+
+	var err error
+
+	consumer, err = kafka.NewConsumer(&kafka.ConfigMap{
 		"bootstrap.servers": "localhost:9092",
-		"group.id":          "heartbeat-consumer-group",
+		"group.id":          "heartbeat-register-consumer-group",
 		"auto.offset.reset": "earliest",
 	})
-
 	if err != nil {
 		fmt.Printf("Failed to create consumer: %s\n", err)
 		os.Exit(1)
 	}
 
-	topics := []string{"heartbeat"}
+	topics := []string{"heartbeat", "registration"}
 	err = consumer.SubscribeTopics(topics, nil)
 	if err != nil {
 		fmt.Printf("Failed to subscribe to topics: %v\n", err)
 		os.Exit(1)
 	}
-
 	sigchan := make(chan os.Signal, 1)
 	signal.Notify(sigchan, syscall.SIGINT, syscall.SIGTERM)
 
@@ -68,14 +68,20 @@ func HandleHeartbeatTopic() {
 		default:
 			ev := consumer.Poll(100)
 			switch e := ev.(type) {
-			case *kafka.Message:
-				var heartbeat Heartbeat
-				if err := json.Unmarshal(e.Value, &heartbeat); err == nil {
-					processHeartbeat(heartbeat)
-				}
-			case kafka.Error:
-				fmt.Fprintf(os.Stderr, "%% Error: %v\n", e)
-				run = false
+				case *kafka.Message:
+					switch *e.TopicPartition.Topic {
+						case "registration":
+							ProcessRegistrationMessage(e.Value)
+						case "heartbeat":
+							var heartbeat Heartbeat
+							if err := json.Unmarshal(e.Value, &heartbeat); err == nil {
+								processHeartbeat(heartbeat)
+							}
+					}
+					
+				case kafka.Error:
+					fmt.Fprintf(os.Stderr, "%% Error: %v\n", e)
+					run = false
 			}
 		}
 	}

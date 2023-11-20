@@ -55,9 +55,13 @@ func init() {
 	metricsConsumer = CreateMetricsConsumer()
 	metricsConsumer.consumer = consumer
 
-	// Subscribe to Kafka topics
-	topics := "metrics"
-	consumer.Subscribe(topics, nil)
+	topics := []string{"metrics"}
+	err = consumer.SubscribeTopics(topics, nil)
+	if err != nil {
+		fmt.Printf("Failed to subscribe to topics: %v\n", err)
+		os.Exit(1)
+	}
+	go HandleHeartbeatRegisterTopics()
 }
 
 // WebSocketClients stores connected clients
@@ -191,8 +195,6 @@ func (prod *Producer) sendTriggerMessage(TestID string) error {
 }
 
 func main() {
-	go HandleRegisterTopic()
-	go HandleHeartbeatTopic()
 	http.HandleFunc("/ws", handleWebSocket)
 	http.HandleFunc("/ping", handlePostTest)
 	http.HandleFunc("/trigger", handleClientTrigger)
