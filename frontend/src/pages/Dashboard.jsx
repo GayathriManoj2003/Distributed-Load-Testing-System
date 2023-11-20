@@ -2,18 +2,23 @@ import axios from 'axios';
 import React, { useState, useEffect, useMemo } from 'react';
 import { useTestID } from '../context/TestIDContext';
 import "./Dashboard.scss"
+import { useNavigate } from 'react-router-dom';
 
 const Dashboard = () => {
   const [nodeStats, setNodeStats] = useState({});
   const [finalStats, setFinalStats] = useState({});
   const { testID, setTestID} = useTestID();
+  const [curTestID, setCurTestID] = useState();
 
-  const CurTestID = useMemo(() => testID, [testID]);
+  const navigate = useNavigate();
   useEffect(() => {
-    setFinalStats(null)
-    trigger();
+    if(testID != null) {
+      setCurTestID(testID)
+      setFinalStats(null)
+      trigger();
+    }
     // eslint-disable-next-line
-  }, [testID]);
+  }, []);
 
   const trigger = async () => {
     if(testID != null) {
@@ -77,7 +82,7 @@ const Dashboard = () => {
   return (
     <div className='dashboard'>
       <h1>Test Results</h1>
-      <h2> Test ID: {CurTestID} </h2>
+      <h2> Test ID: {curTestID} </h2>
       {finalStats ? <h3> Test Complete </h3> : <h3> Test in Progress</h3>}
       <div>
         {finalStats && (
@@ -90,6 +95,8 @@ const Dashboard = () => {
           </div>
         )}
       </div>
+      {finalStats && (<button className= "nav-button"
+      onClick={() => navigate("/")}>Go Back To Home</button>)}  
       <div className='nodestats'>
         <h2>Driver Node Statistics</h2>
         {Object.keys(nodeStats).map((nodeID) => (
