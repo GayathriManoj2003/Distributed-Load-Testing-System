@@ -6,6 +6,7 @@
     height: 500px;
     text-align: center;
     padding: 20px;
+    max-width: fit-content;
     background-color: white;
     border-radius: 10px;
     box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
@@ -16,7 +17,7 @@
   h1 {
     color: #3498db;
     text-shadow: 0cap;
-    font-family: 'serif';
+    font-family: 'Times New Roman';
   }
   
   p {
@@ -24,7 +25,10 @@
     margin-top: 50px;
     margin-bottom: 50px;
     font-size: x-large;
-    font-family: 'Times New Roman';
+    text-align: justify;
+    margin-right: 20px;
+    margin-left: 20px;
+    font-family:  'Times New Roman';
   }
   
   .new-test-button {
@@ -35,7 +39,7 @@
     border: none;
     border-radius: 5px;
     cursor: pointer;
-    font-family: 'serif';
+    font-family:  'Times New Roman';
   }
   
   .new-test-button:hover {
