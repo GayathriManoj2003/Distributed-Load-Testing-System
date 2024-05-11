@@ -26,7 +26,7 @@ func HandleHeartbeatRegisterTopics() {
 	var err error
 
 	consumer, err = kafka.NewConsumer(&kafka.ConfigMap{
-		"bootstrap.servers": "localhost:9092",
+		"bootstrap.servers": Kafka_URL,
 		"group.id":          "heartbeat-register-consumer-group",
 		"auto.offset.reset": "earliest",
 	})
