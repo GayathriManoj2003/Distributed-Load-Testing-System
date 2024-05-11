@@ -1,7 +1,7 @@
 import axios from 'axios';
 import React, { useState, useEffect } from 'react';
 import { useTestID } from '../context/TestIDContext';
-import "./Dashboard.scss"
+import "../styles/Dashboard.scss"
 import { useNavigate } from 'react-router-dom';
 
 const Dashboard = () => {
@@ -16,6 +16,8 @@ const Dashboard = () => {
       setCurTestID(testID)
       setFinalStats(null)
       trigger();
+    } else {
+      navigate("/");
     }
     // eslint-disable-next-line
   }, []);
