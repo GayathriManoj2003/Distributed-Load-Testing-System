@@ -232,7 +232,7 @@ func main() {
 	sigchan := make(chan os.Signal, 1)
 	signal.Notify(sigchan, syscall.SIGINT, syscall.SIGTERM)
 	var test TestConfig
-	for run == true {
+	for run {
 		select {
 		case sig := <-sigchan:
 			fmt.Printf("Caught signal %v: terminating\n", sig)
@@ -372,7 +372,7 @@ func performTsunamiTest(testConfig TestConfig, nodeID string) {
 		latency := float64(time.Since(startTime).Milliseconds())
 
 		// Print results
-		fmt.Printf("Request %d - Latency: %d ms\n", i, latency)
+		fmt.Printf("Request %d - Latency: %0.3f ms\n", i, latency)
 		current_latency_mutex.Lock()
 		req++
 		currentLatencies = append(currentLatencies, latency)
@@ -455,7 +455,7 @@ func performAvalancheTest(testConfig TestConfig, nodeID string) {
 		latency := float64(time.Since(startTime).Milliseconds())
 
 		// Print results
-		fmt.Printf("Request %d - Latency: %d ms\n", i, latency)
+		fmt.Printf("Request %d - Latency: %0.02f ms\n", i, latency)
 		current_latency_mutex.Lock()
 		req++
 		currentLatencies = append(currentLatencies, latency)
