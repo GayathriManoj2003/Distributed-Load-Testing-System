@@ -29,6 +29,8 @@ var wsMutex sync.Mutex
 func init() {
 	var err error
 
+	ensureDirectoriesExist()
+
 	// Initialize Kafka producer
 	p, err = kafka.NewProducer(&kafka.ConfigMap{
 		"bootstrap.servers": "localhost:9092",
@@ -63,6 +65,21 @@ func init() {
 		os.Exit(1)
 	}
 	go HandleHeartbeatRegisterTopics()
+}
+
+func ensureDirectoriesExist() {
+    directories := []string{"Test_Reports", "Final_Test_Reports"}
+
+    for _, dir := range directories {
+        if _, err := os.Stat(dir); os.IsNotExist(err) {
+            err := os.MkdirAll(dir, 0755)
+            if err != nil {
+                fmt.Printf("Error creating directory %s: %v\n", dir, err)
+            } else {
+                fmt.Printf("Directory %s created successfully\n", dir)
+            }
+        }
+    }
 }
 
 // WebSocketClients stores connected clients
