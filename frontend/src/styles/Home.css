@@ -1,0 +1,45 @@
+/* Home.css */
+.home-container {
+	margin: auto;
+	width: 70%;
+	display: flex;
+	flex-direction: column;
+    align-items: center;
+    padding: 40px;
+    background-color: white;
+    border-radius: 10px;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+
+	h1 {
+		color: #3498db;
+		text-shadow: 0cap;
+		font-size: 45px;
+		margin: auto;
+		text-align: center;
+		padding: 20px 10px 20px 10px;
+	}
+
+	p {
+		color: #333;
+		font-size: x-large;
+		text-align: justify;
+		margin: 30px 20px;
+	}
+
+	.new-test-button {
+		background-color: #3498db;
+		color: #fff;
+		padding: 10px 20px;
+		font-size: 30px;
+		border: none;
+		border-radius: 5px;
+		cursor: pointer;
+		font-family:  'Serif';
+		font-size: 30px;
+		margin: 30px;
+	}
+
+	.new-test-button:hover {
+		background-color: #3db1ff;
+	}
+}
