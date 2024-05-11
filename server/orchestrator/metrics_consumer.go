@@ -3,7 +3,6 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"math"
 	"os"
 	"os/signal"
@@ -201,7 +200,7 @@ func (mc *MetricsConsumer) calculateAndStoreAggregatedMetrics(key string) {
 
 	// Save to a JSON file
 	fileName := fmt.Sprintf("Test_Reports/Node_Test_%s_%s_metrics.json", mc.aggregatedMetrics[key].TestID,mc.aggregatedMetrics[key].NodeID)
-	err = ioutil.WriteFile(fileName, jsonData, 0644)
+	err = os.WriteFile(fileName, jsonData, 0644)
 	if err != nil {
 		fmt.Printf("Error writing to file: %v\n", err)
 		return
@@ -237,7 +236,7 @@ func (mc *MetricsConsumer) calculateAndStoreAggregatedMetrics(key string) {
 	
 		// Save to a JSON file
 		storedFileName := fmt.Sprintf("Final_Test_Reports/%s_metrics.json", mc.aggregatedMetrics[key].TestID)
-		err = ioutil.WriteFile(storedFileName, storedJsonData, 0644)
+		err = os.WriteFile(storedFileName, storedJsonData, 0644)
 		if err != nil {
 			fmt.Printf("Error writing to file: %v\n", err)
 			return
