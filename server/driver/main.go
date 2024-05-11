@@ -16,6 +16,7 @@ import (
 	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
 )
 
+var Kafka_URL string = os.Getenv("BOOTSTRAP_SERVER")
 type RegistrationMessage struct {
 	NodeID string `json:"node_id"`
 }
@@ -75,7 +76,7 @@ func generateUniqueToken() (string, error) {
 
 func NewMetricProducer() *MetricProducer {
 	p, err := kafka.NewProducer(&kafka.ConfigMap{
-		"bootstrap.servers": "localhost:9092",
+		"bootstrap.servers": Kafka_URL,
 		"client.id":         "metric-producer",
 	})
 
@@ -91,7 +92,7 @@ func NewMetricProducer() *MetricProducer {
 }
 func NewHeartbeatProducer() *HeartbeatProducer {
 	p, err := kafka.NewProducer(&kafka.ConfigMap{
-		"bootstrap.servers": "localhost:9092",
+		"bootstrap.servers": Kafka_URL,
 		"client.id":         "heartbeat-producer",
 	})
 
@@ -212,7 +213,7 @@ func main() {
 	}
 
 	consumer, err := kafka.NewConsumer(&kafka.ConfigMap{
-		"bootstrap.servers": "localhost:9092",
+		"bootstrap.servers": Kafka_URL,
 		"group.id":          nodeID,
 		"auto.offset.reset": "latest",
 	})
