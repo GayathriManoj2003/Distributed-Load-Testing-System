@@ -1,12 +1,13 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
-	"encoding/json"
+
 	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
 )
 
@@ -56,7 +57,7 @@ func HandleHeartbeatRegisterTopics() {
 					delete(NodeIDList.list, nodeID)
 					NodeIDList.Unlock()
 					NodeIDList.RLock()
-					
+
 					nodeIDMessage := FailureMessage{NodeID: nodeID}
 
 					// Marshal the struct into a JSON-formatted string
@@ -78,7 +79,7 @@ func HandleHeartbeatRegisterTopics() {
 	}()
 
 	run := true
-	for run == true {
+	for run {
 		select {
 		case sig := <-sigchan:
 			fmt.Printf("Caught signal %v: terminating\n", sig)
@@ -96,7 +97,7 @@ func HandleHeartbeatRegisterTopics() {
 								processHeartbeat(heartbeat)
 							}
 					}
-					
+
 				case kafka.Error:
 					fmt.Fprintf(os.Stderr, "%% Error: %v\n", e)
 					run = false
