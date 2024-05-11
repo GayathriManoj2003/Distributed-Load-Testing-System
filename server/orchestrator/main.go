@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
@@ -25,6 +26,7 @@ var prod *Producer
 var consumer *kafka.Consumer
 var metricsConsumer *MetricsConsumer
 var wsMutex sync.Mutex
+var Kafka_URL string = os.Getenv("BOOTSTRAP_SERVER")
 
 func init() {
 	var err error
@@ -33,7 +35,7 @@ func init() {
 
 	// Initialize Kafka producer
 	p, err = kafka.NewProducer(&kafka.ConfigMap{
-		"bootstrap.servers": "localhost:9092",
+		"bootstrap.servers": Kafka_URL,
 		"client.id":         "something",
 		"acks":              "all",
 	})
@@ -44,7 +46,7 @@ func init() {
 
 	// Initialize Kafka consumer
 	consumer, err = kafka.NewConsumer(&kafka.ConfigMap{
-		"bootstrap.servers": "localhost:9092",
+		"bootstrap.servers": Kafka_URL,
 		"group.id":          "metrics-consumer-group",
 		"auto.offset.reset": "earliest",
 	})
@@ -53,13 +55,40 @@ func init() {
 		os.Exit(1)
 	}
 
+	// Create Kafka AdminClient
+    adminClient, err := kafka.NewAdminClient(&kafka.ConfigMap{
+        "bootstrap.servers": Kafka_URL,
+    })
+    if err != nil {
+        fmt.Printf("Failed to create admin client: %s\n", err)
+        os.Exit(1)
+    }
+
+    defer adminClient.Close()
+
+    // Define topic configurations
+    topics := []kafka.TopicSpecification{
+        {Topic: "heartbeat", NumPartitions: 1, ReplicationFactor: 1},
+        {Topic: "registration", NumPartitions: 1, ReplicationFactor: 1},
+        {Topic: "test_config", NumPartitions: 1, ReplicationFactor: 1},
+        {Topic: "trigger", NumPartitions: 1, ReplicationFactor: 1},
+        {Topic: "metrics", NumPartitions: 1, ReplicationFactor: 1},
+    }
+
+    // Create topics
+    _, err = adminClient.CreateTopics(context.Background(), topics)
+    if err != nil {
+        fmt.Printf("Failed to create topics: %v\n", err)
+        os.Exit(1)
+    }
+
 	// Create instances of Producer and MetricsConsumer
 	prod = CreateProducer(p)
 	metricsConsumer = CreateMetricsConsumer()
 	metricsConsumer.consumer = consumer
 
-	topics := []string{"metrics"}
-	err = consumer.SubscribeTopics(topics, nil)
+	topics1 := []string{"metrics"}
+	err = consumer.SubscribeTopics(topics1, nil)
 	if err != nil {
 		fmt.Printf("Failed to subscribe to topics: %v\n", err)
 		os.Exit(1)
@@ -216,10 +245,15 @@ func (prod *Producer) sendTriggerMessage(TestID string) error {
 
 func main() {
 	http.HandleFunc("/ws", handleWebSocket)
-	http.HandleFunc("/ping", handlePostTest)
+	http.HandleFunc("/tests", handlePostTest)
 	http.HandleFunc("/trigger", handleClientTrigger)
+	http.HandleFunc("/ping", handlePing)
 	fmt.Println("Starting server on :8080...")
 	http.ListenAndServe(":8080", addCorsHeaders(http.DefaultServeMux))
+}
+
+func handlePing(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusOK)
 }
 
 func handleClientTrigger(w http.ResponseWriter, r *http.Request) {
