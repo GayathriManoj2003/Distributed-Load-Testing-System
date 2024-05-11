@@ -13,6 +13,11 @@ services:
       ZOOKEEPER_SERVERS: zoo1:2888:3888
     networks:
       - kafka_network
+    healthcheck:
+      test: ["CMD", "echo", "ruok", "|", "nc", "localhost", "2181"]
+      interval: 20s
+      timeout: 10s
+      retries: 10
 
   kafka1:
     image: confluentinc/cp-kafka:7.3.2
@@ -37,12 +42,13 @@ services:
       KAFKA_AUTHORIZER_CLASS_NAME: kafka.security.authorizer.AclAuthorizer
       KAFKA_ALLOW_EVERYONE_IF_NO_ACL_FOUND: "true"
     depends_on:
-      - zoo1
+      zoo1:
+       condition: service_healthy
     healthcheck:
       test: ["CMD", "kafka-topics", "--bootstrap-server", "kafka1:9092", "--list"]
-      interval: 10s
+      interval: 20s
       timeout: 10s
-      retries: 5
+      retries: 10
     networks:
       - kafka_network
 
@@ -55,11 +61,13 @@ services:
       - "8080:8080"
     healthcheck:
       test: ["CMD", "curl", "--fail", "http://orchestrator:8080/ping"]
-      interval: 10s
+      interval: 20s
       timeout: 10s
-      retries: 3
+      retries: 10
     networks:
       - kafka_network
+    environment:
+      BOOTSTRAP_SERVER: "kafka1:19092"
 
   driver:
     build: ./driver
@@ -70,6 +78,8 @@ services:
         condition: service_healthy
     networks:
       - kafka_network
+    environment:
+      BOOTSTRAP_SERVER: "kafka1:19092"
 
 networks:
   kafka_network:
