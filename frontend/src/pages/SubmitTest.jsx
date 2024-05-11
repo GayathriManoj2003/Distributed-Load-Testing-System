@@ -2,6 +2,7 @@ import React, { useRef, useState } from 'react'
 import axios from "axios"
 import { useNavigate } from 'react-router-dom';
 import { useTestID } from '../context/TestIDContext';
+import "../styles/SubmitTest.css"
 
 const SubmitTest = () => {
     const [inputs, setInputs] = useState({
@@ -29,7 +30,7 @@ const SubmitTest = () => {
         e.preventDefault();
     
         try {
-            const res = await axios.post("http://localhost:8080/ping", inputs, {
+            const res = await axios.post("http://localhost:8080/tests", inputs, {
                 headers: {
                     "Content-Type": "application/json",
                 },
@@ -43,7 +44,7 @@ const SubmitTest = () => {
     };    
     
     return (
-        <div>
+        <div className = "submit-test">
             <h1>New Test</h1>
             <div className="container">
                 <div className= "form">
