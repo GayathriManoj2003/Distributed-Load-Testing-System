@@ -1,16 +1,17 @@
 package main
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"os"
 	"net/http"
-	"crypto/rand"
+	"os"
+	"sync"
 	"time"
-	"encoding/hex"
+
 	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
 	"github.com/gorilla/websocket"
-	"sync"
 )
 
 var upgrader = websocket.Upgrader{

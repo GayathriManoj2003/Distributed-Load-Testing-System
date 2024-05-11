@@ -1,12 +1,12 @@
 package main
 
-
 import (
 	"encoding/json"
 	"fmt"
 	"sync"
 	"time"
 )
+
 // RegistrationMessage struct represents the structure of the registration message.
 type RegistrationMessage struct {
 	NodeID string `json:"node_id"`
