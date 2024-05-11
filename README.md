@@ -30,7 +30,7 @@ The system utilizes Kafka as a single point of communication, publishing and sub
 ### Observability
 
 * The Orchestrator node tracks the number of requests sent by each driver node, updating at a maximum interval of one second.
-* The Orchestrator node provides a dashboard with aggregated {min, max, mean, median, mode} response latency across all nodes and for each node.
+* The frontend a dashboard with aggregated {min, max, mean, median, mode} response latency across all nodes and for each node.
 * The orchestrator node stores the reports of each test and each node at the end of the test as JSON files.
 
 ### Dockerization
