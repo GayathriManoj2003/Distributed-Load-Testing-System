@@ -40,7 +40,6 @@ type MetricsMessage struct {
 type MetricsConsumer struct {
 	consumer           *kafka.Consumer
 	aggregatedMetrics  map[string]*AggregatedMetrics
-	aggregatedRequests int
 	totalNumRequests   int
 	metricsLock        sync.Mutex
 	requestBody        RequestBody
